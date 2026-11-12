@@ -12,6 +12,8 @@ Page de test des interfaces
 | PNR 2024 — version 2 | [Code de PNR 2024 — version 2](https://github.com/SDT-ENSA/Singularite-des-territoires/blob/main/pnr-2024-2.html) | [Ouvrir PNR 2024 — version 2](https://sdt-ensa.github.io/Singularite-des-territoires/pnr-2024-2.html) |
 | Rose de Bruno | [Code de Rose de Bruno](https://github.com/SDT-ENSA/Singularite-des-territoires/blob/main/rose-de-bruno.html) | [Ouvrir Rose de Bruno](https://sdt-ensa.github.io/Singularite-des-territoires/rose-de-bruno.html) |
 | Rose de Bruno — version 2 | [Code de Rose de Bruno — version 2](https://github.com/SDT-ENSA/Singularite-des-territoires/blob/main/rose-de-bruno-2.html) | [Ouvrir Rose de Bruno — version 2](https://sdt-ensa.github.io/Singularite-des-territoires/rose-de-bruno-2.html) |
+| Territoire habité — Vidéo diagramme | [Code de vidéo-diagramme](./video-diagramme.html) | [Ouvrir Vidéo diagramme](https://sdt-ensa.github.io/Singularite-des-territoires/video-diagramme.html) |
+| Territoire habité — Diagramme vidéo | [Code de diagramme-vidéo](./diagramme-vid%C3%A9o.html) | [Ouvrir Diagramme vidéo](https://sdt-ensa.github.io/Singularite-des-territoires/diagramme-vid%C3%A9o.html) |
 
 ### Ajouter un test
 
