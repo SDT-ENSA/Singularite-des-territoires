@@ -1,0 +1,1276 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Demain Architecture Laboratory – Carte interactive</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,600;1,700&family=Barlow+Condensed:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+/* ====== COULEURS (modifiables) ====== */
+:root { --rouge: #d0402b; --jaune: #f3e600; --bordeaux: #7a1414; --nouveau: #2ec4b6; }
+body.nuit {
+  --fond: #191919; --enclos: #3a3a3a; --enclos-bord: #474747; --texte: #e8e5de; --doux: #bdb9b0;
+  --gris: #8d8a83; --filet: #353535; --panneau: #1f1f1f; --survol: #2a2a2a; --ui: #262626;
+  --notion: #b9d095; --notion-fond: #2b4219; --accent: #f3d83a;
+}
+body.jour {
+  --fond: #f6f4ef; --enclos: #e6e2d9; --enclos-bord: #d6d1c6; --texte: #3d3c38; --doux: #5d5c58;
+  --gris: #8f8c86; --filet: #dcd8d0; --panneau: #ffffff; --survol: #f2efe8; --ui: #ffffff;
+  --notion: #3f5d22; --notion-fond: #e1ebd1; --accent: #b8321f;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Barlow', sans-serif; background: var(--fond); color: var(--texte);
+  height: 100vh; overflow: hidden; display: flex; transition: background .4s, color .4s;
+}
+body.tourne-en-cours, body.tourne-en-cours * { cursor: grabbing !important; }
+
+/* ====== ZONE DE LA CARTE ====== */
+#chart { flex: 1; position: relative; overflow: hidden; }
+#chart > svg { width: 100%; height: 100%; display: block; cursor: grab; }
+#chart > svg:active { cursor: grabbing; }
+#progression { position: absolute; top: 0; left: 0; height: 3px; width: 0; background: var(--accent); z-index: 6; }
+
+.titre { position: absolute; top: 22px; left: 0; right: 0; text-align: center; pointer-events: none; z-index: 2; }
+.titre h1 { font-weight: 500; font-size: 26px; letter-spacing: .12em; text-transform: uppercase; }
+.titre h1 span { border-bottom: 3px solid var(--jaune); }
+.titre p { font-weight: 300; font-size: 13px; letter-spacing: .14em; color: var(--gris); text-transform: uppercase; margin-top: 6px; }
+#indic-rot {
+  position: absolute; top: 84px; left: 50%; transform: translateX(-50%); z-index: 6; pointer-events: none;
+  font-family: 'Barlow Condensed'; font-size: 20px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--accent); background: var(--ui); border: 1px solid var(--filet); padding: 4px 14px;
+  opacity: 0; transition: opacity .25s;
+}
+#indic-rot.visible { opacity: 1; }
+
+/* ====== PANNEAU DES ANNEAUX ====== */
+.anneaux {
+  position: absolute; top: 96px; left: 24px; z-index: 5; width: 230px;
+  background: var(--ui); border: 1px solid var(--filet); padding: 10px 12px; font-size: 12px; opacity: .96;
+}
+.an-titre { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; font-weight: 600; color: var(--gris); margin-bottom: 6px; }
+.an-titre small { display: block; font-weight: 400; letter-spacing: .02em; text-transform: none; font-style: italic; margin-top: 2px; }
+.an-ligne { display: grid; grid-template-columns: 1fr 26px 52px 26px; align-items: center; gap: 4px; padding: 2px 0; }
+.an-ligne button, .an-actions button {
+  font: inherit; background: none; border: 1px solid var(--filet); color: var(--texte); cursor: pointer; height: 24px;
+}
+.an-ligne button:hover, .an-actions button:hover { border-color: var(--accent); color: var(--accent); }
+.an-crans { text-align: center; font-size: 11px; color: var(--gris); }
+.an-ligne.tourne .an-nom, .an-ligne.tourne .an-crans { color: var(--accent); }
+.an-actions { display: flex; gap: 6px; margin-top: 8px; }
+.an-actions button { flex: 1; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; }
+.an-option { display: flex; gap: 6px; align-items: center; margin-top: 8px; font-size: 11.5px; color: var(--doux); cursor: pointer; }
+
+/* ====== OUTILS ====== */
+.outils { position: absolute; left: 24px; bottom: 20px; display: flex; flex-direction: column; gap: 9px; z-index: 5; }
+.recherche { position: relative; width: 320px; }
+.recherche input {
+  font: inherit; font-size: 14px; width: 100%; padding: 7px 80px 7px 2px; color: var(--texte);
+  background: transparent; border: none; border-bottom: 1px solid var(--gris); outline: none;
+}
+.recherche input:focus { border-bottom-color: var(--accent); }
+.recherche input::placeholder { color: var(--gris); font-style: italic; }
+#nb { position: absolute; right: 0; top: 9px; font-size: 11px; color: var(--accent); letter-spacing: .05em; }
+#resultats {
+  position: absolute; bottom: calc(100% + 6px); left: 0; width: 340px; list-style: none;
+  background: var(--panneau); border: 1px solid var(--filet); box-shadow: 0 10px 30px rgba(0,0,0,.25);
+  max-height: 300px; overflow-y: auto; display: none;
+}
+#resultats.ouvert { display: block; }
+#resultats li { padding: 7px 12px; font-size: 13px; cursor: pointer; border-bottom: 1px solid var(--filet); }
+#resultats li:hover { background: var(--survol); }
+#resultats small { display: block; color: var(--gris); font-size: 11px; }
+.pilules { display: flex; gap: 6px; flex-wrap: wrap; max-width: 600px; }
+.pilule {
+  font: inherit; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase;
+  border: 1px solid var(--filet); background: var(--ui); color: var(--gris);
+  border-radius: 999px; padding: 5px 12px; cursor: pointer; transition: all .2s;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.pilule:hover { color: var(--texte); border-color: var(--gris); }
+.pilule.on { color: var(--accent); border-color: var(--accent); }
+.pilule .pastille { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.pilule.off-type { opacity: .45; text-decoration: line-through; }
+.zoom { position: absolute; right: 20px; bottom: 20px; display: flex; flex-direction: column; gap: 6px; z-index: 5; }
+.zoom button {
+  width: 34px; height: 34px; font: inherit; font-size: 18px; color: var(--texte);
+  background: var(--ui); border: 1px solid var(--filet); cursor: pointer;
+}
+.zoom button:hover { border-color: var(--accent); color: var(--accent); }
+#minimap {
+  position: absolute; right: 64px; bottom: 20px; width: 170px; height: 150px; z-index: 5;
+  background: var(--ui); border: 1px solid var(--filet); cursor: crosshair; opacity: .92;
+}
+#minimap svg { width: 100%; height: 100%; display: block; }
+.mini-vue { fill: rgba(243,216,58,.12); stroke: var(--accent); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+
+/* ====== ÉLÉMENTS DU SVG ====== */
+.enclos { fill: var(--enclos); stroke: var(--enclos-bord); stroke-width: 1.5; transition: opacity .35s, fill .4s; }
+.enclos.attenue { opacity: .35; }
+.rail .trace { fill: none; stroke: var(--enclos-bord); stroke-width: 1; stroke-dasharray: 2 6; opacity: .8; transition: stroke .2s, opacity .2s; }
+.rail .prise { fill: none; stroke: transparent; stroke-width: 28; pointer-events: stroke; cursor: grab; }
+.rail.actif .trace { stroke: var(--accent); stroke-width: 2; opacity: 1; }
+.lien { fill: none; transition: opacity .35s; }
+.lien-fleche, .lien-axe { stroke: var(--rouge); stroke-width: 3; stroke-dasharray: 2.5 2; }
+.lien-notion { stroke: var(--gris); stroke-width: .8; stroke-opacity: .7; }
+.lien.nouveau { stroke: var(--nouveau); }
+.lien-notion.nouveau { stroke-opacity: 1; stroke-width: 1.2; }
+.lien.sur-chemin { stroke: var(--accent) !important; stroke-width: 5px; stroke-dasharray: none; }
+.particule { fill: #ffe066; pointer-events: none; }
+body.jour .particule { fill: #e8590c; }
+.resonance { fill: none; stroke: var(--accent); stroke-width: 1.6; stroke-dasharray: 1 6; stroke-linecap: round; opacity: .8; transition: opacity .35s; }
+.resonance.masquee { display: none; }
+svg.sans-resonances .couche-resonances, svg.sans-flux .couche-particules, svg.sans-notions .couche-notions { display: none; }
+
+.noeud { cursor: pointer; transition: opacity .35s; }
+.attenue { opacity: .1; }
+.filtre { opacity: .04 !important; pointer-events: none; }
+.noeud:hover .disque { stroke: var(--accent); stroke-width: 3px; }
+.choisi .disque { stroke: var(--accent) !important; stroke-width: 4.5px !important; stroke-dasharray: none !important; }
+.trouve .disque { stroke: #ffb703 !important; stroke-width: 5px !important; animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { stroke-opacity: .25; } }
+.badge-note { fill: var(--accent); stroke: var(--fond); stroke-width: 1.5; display: none; }
+.annote .badge-note { display: inline; }
+.annote .t-notion { fill: var(--accent); }
+.repere-pt { fill: #fff; stroke: #777; stroke-width: 1.2; }
+
+.t-centre { font-weight: 700; font-size: 13.5px; fill: var(--bordeaux); text-decoration: underline; letter-spacing: .02em; }
+.t-pilier { font-style: italic; font-size: 14px; fill: #222; letter-spacing: .03em; }
+.t-pole   { font-style: italic; font-size: 12.5px; fill: #222; }
+.accent .t-pole { font-weight: 700; fill: var(--bordeaux); }
+.t-source { font-style: italic; font-size: 10.5px; }
+.accent .t-source { font-weight: 700; }
+.t-notion { font-size: 9.5px; font-style: italic; text-transform: uppercase; letter-spacing: .03em; fill: var(--notion); }
+svg.loin .t-notion { display: none; }
+svg.tres-loin .t-source { display: none; }
+
+/* ====== INFO-BULLE ====== */
+#tooltip {
+  position: absolute; pointer-events: none; z-index: 10; max-width: 290px;
+  background: var(--panneau); color: var(--texte); border: 1px solid var(--filet); padding: 12px 14px;
+  box-shadow: 0 10px 28px rgba(0,0,0,.25); font-size: 12.5px;
+  opacity: 0; transform: translateY(4px); transition: opacity .15s, transform .15s;
+}
+#tooltip.visible { opacity: 1; transform: none; }
+.tt-niveau { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; font-weight: 600; }
+.tt-nom { font-family: 'Barlow Condensed'; font-size: 20px; text-transform: uppercase; letter-spacing: .04em; margin: 2px 0 4px; }
+.tt-chemin { color: var(--gris); font-size: 11.5px; }
+.tt-notions { margin-top: 6px; color: var(--notion); font-style: italic; font-size: 12px; }
+.tt-desc { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--filet); line-height: 1.45; color: var(--doux); }
+.tt-note { margin-top: 8px; color: var(--accent); font-style: italic; }
+.tt-nouveau { margin-top: 6px; color: var(--nouveau); font-size: 11.5px; }
+.tt-astuce { margin-top: 8px; color: var(--gris); font-size: 11px; font-style: italic; }
+
+/* ====== PANNEAU LATÉRAL ====== */
+aside {
+  width: 370px; background: var(--panneau); border-left: 1px solid var(--filet);
+  padding: 30px 28px; overflow-y: auto; animation: fondu .4s; transition: background .4s;
+}
+@keyframes fondu { from { opacity: 0; } }
+.kicker { font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; font-weight: 600; }
+aside h2 {
+  font-family: 'Barlow Condensed'; font-weight: 300; font-size: 34px; line-height: 1.05;
+  text-transform: uppercase; letter-spacing: .04em; margin: 6px 0 10px;
+}
+aside p { font-size: 13.5px; line-height: 1.6; color: var(--doux); }
+.fil { font-size: 12px; color: var(--gris); margin-bottom: 12px; }
+.fil a { cursor: pointer; border-bottom: 1px dotted var(--gris); }
+.fil a:hover { color: var(--accent); }
+.chiffres { display: grid; grid-template-columns: repeat(auto-fit, minmax(60px, 1fr)); margin: 20px 0 6px; border-top: 1px solid var(--filet); border-bottom: 1px solid var(--filet); }
+.chiffres div { padding: 12px 0; text-align: center; }
+.chiffres div + div { border-left: 1px solid var(--filet); }
+.chiffres b { display: block; font-family: 'Barlow Condensed'; font-weight: 300; font-size: 32px; line-height: 1; }
+.chiffres span { font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--gris); }
+aside h3 {
+  font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--gris); font-weight: 600;
+  margin: 26px 0 10px; display: flex; align-items: center; gap: 10px;
+}
+aside h3::after { content: ""; flex: 1; height: 1px; background: var(--filet); }
+.ligne { display: flex; align-items: center; gap: 8px; padding: 3px 4px; font-size: 13px; cursor: pointer; transition: background .2s; }
+.ligne:hover { background: var(--survol); }
+.ligne b { margin-left: auto; font-weight: 500; color: var(--gris); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+.ligne small { color: var(--gris); font-size: 11px; margin-left: 6px; }
+.nv { font-style: normal; color: var(--nouveau); margin-left: 4px; }
+.puces { display: flex; flex-wrap: wrap; gap: 6px; }
+.puce {
+  font-size: 11px; font-style: italic; text-transform: uppercase; letter-spacing: .03em; cursor: pointer;
+  background: var(--notion-fond); color: var(--notion); padding: 4px 9px; border-radius: 3px;
+}
+.puce:hover { outline: 1px solid var(--notion); }
+.insight { margin-top: 14px; padding: 10px 12px; font-size: 12.5px; line-height: 1.5; border-left: 2px solid var(--accent); background: var(--survol); color: var(--doux); }
+.insight.nouv { border-left-color: var(--nouveau); }
+.insight.nouv b { color: var(--nouveau); }
+.alerte { margin-top: 12px; padding: 10px 12px; font-size: 12.5px; color: #e09a4a; border-left: 2px solid #e09a4a; background: var(--survol); }
+.matrice { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+.matrice th { font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600; text-align: left; padding: 4px; cursor: pointer; }
+.matrice td { padding: 5px 4px; border-bottom: 1px solid var(--filet); vertical-align: top; cursor: pointer; line-height: 1.3; }
+.matrice td:hover { background: var(--survol); }
+.matrice td.pol { font-style: italic; text-transform: uppercase; font-size: 10.5px; color: var(--texte); }
+.matrice td.change { background: rgba(46,196,182,.14); }
+.matrice tr.pil td { font-family: 'Barlow Condensed'; font-size: 15px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); padding-top: 12px; border-bottom: none; }
+.lettre { font-family: 'Barlow Condensed'; font-size: 22px; color: var(--accent); margin: 12px 0 2px; }
+.etape { display: flex; align-items: center; gap: 10px; padding: 6px 4px; cursor: pointer; font-size: 13px; }
+.etape:hover { background: var(--survol); }
+.etape i { font-style: normal; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--gris); margin-left: auto; }
+.fleche-bas { padding-left: 13px; color: var(--rouge); font-size: 12px; line-height: 1; }
+textarea {
+  width: 100%; min-height: 80px; font: inherit; font-size: 13px; padding: 8px 10px; resize: vertical;
+  background: var(--fond); color: var(--texte); border: 1px solid var(--filet); outline: none;
+}
+textarea:focus { border-color: var(--accent); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.bouton {
+  font: inherit; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; cursor: pointer;
+  color: var(--texte); background: var(--ui); border: 1px solid var(--filet); padding: 7px 12px;
+}
+.bouton:hover { border-color: var(--accent); color: var(--accent); }
+.legende { display: grid; grid-template-columns: 34px 1fr; gap: 6px 8px; align-items: center; font-size: 12.5px; color: var(--doux); }
+.aide { font-size: 12.5px; color: var(--gris); line-height: 1.9; list-style: none; }
+.aide kbd { font-family: inherit; font-size: 10.5px; border: 1px solid var(--filet); padding: 1px 5px; border-radius: 3px; color: var(--texte); }
+.astuce { font-size: 12px !important; color: var(--gris) !important; font-style: italic; margin-top: 14px; }
+.retour { margin-top: 24px; font: inherit; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); background: none; border: none; cursor: pointer; }
+
+@media (max-width: 900px) {
+  body { flex-direction: column; }
+  aside { width: 100%; height: 42%; border-left: none; border-top: 1px solid var(--filet); }
+  #minimap { display: none; }
+  .titre h1 { font-size: 18px; } .titre p { font-size: 11px; }
+  .recherche { width: 240px; }
+  .anneaux { top: 70px; transform: scale(.85); transform-origin: top left; }
+}
+</style>
+</head>
+<body class="nuit">
+
+<div id="chart">
+  <div id="progression"></div>
+  <div class="titre">
+    <h1><span>Demain</span> Architecture Laboratory</h1>
+    <p>Carte mentale · Jeu(x) · Enthousiasme · Pensée</p>
+  </div>
+  <div id="indic-rot"></div>
+  <div class="anneaux">
+    <div class="an-titre">Anneaux<small>Glissez un rond ou un anneau pour le faire tourner</small></div>
+    <div id="anneaux-lignes"></div>
+    <div class="an-actions"><button id="melanger" title="Touche M">⟳ Mélanger</button><button id="origine" title="Touche O">Origine</button></div>
+    <label class="an-option"><input type="checkbox" id="entrainer"> Entraîner les anneaux extérieurs</label>
+  </div>
+  <div id="tooltip"></div>
+  <div class="outils">
+    <div class="recherche">
+      <ul id="resultats"></ul>
+      <input id="recherche" type="text" autocomplete="off" placeholder="Rechercher une figure, un projet, une notion…  ( / )">
+      <span id="nb"></span>
+    </div>
+    <div class="pilules" id="pilules-types"></div>
+    <div class="pilules">
+      <button class="pilule on" data-opt="notions">Notions</button>
+      <button class="pilule on" data-opt="flux">Flux</button>
+      <button class="pilule on" data-opt="resonances">Résonances</button>
+      <button class="pilule" id="visite">▶ Visite guidée</button>
+      <button class="pilule" id="index">Index A–Z</button>
+      <button class="pilule" id="theme">☀ Jour</button>
+      <button class="pilule" id="recentrer">Recentrer</button>
+    </div>
+  </div>
+  <div id="minimap"></div>
+  <div class="zoom"><button id="zplus" title="Zoomer">+</button><button id="zmoins" title="Dézoomer">−</button></div>
+</div>
+<aside id="panneau"></aside>
+
+<script>
+// =====================================================
+// 1. LES DONNÉES : une ligne = une source + ses notions (séparées par |)
+//    type : figure (bleu) · projet (rose) · pratique (violet)
+// =====================================================
+const csv = `pilier,pole,source,type,notions
+Jeu(x),Chambre de commerce,Improvisation,pratique,Le déjà là|L'instant présent|L'écoute
+Jeu(x),Chambre de commerce,ENSA Nantes,projet,L'école|Les communautés|La recherche
+Jeu(x),Chambre de commerce,Wayne Shorter,figure,L'attente active|Le potentiel|La concentration
+Jeu(x),Démocratie,Observation présence,pratique,Le motif|L'effet|La figure
+Jeu(x),Démocratie,Divers(c)ités,projet,La résidence|L'échelle 1/1|Les summer courses
+Jeu(x),Démocratie,Calder,figure,Le dépassement|L'élan|Le point de vue
+Jeu(x),Diagramme,Sacré,pratique,Le vide|L'établissement|La continuation
+Jeu(x),Diagramme,Singularité territoires,projet,La ressource|Le cadre de vie|L'autre
+Jeu(x),Diagramme,Desmarais Richot,figure,L'anthropologique|Le politique|L'interface abstraite|L'économique
+Enthousiasme,Déplacement,Idraulico geek,pratique,Les outils|L'interface|L'instruction
+Enthousiasme,Déplacement,Séjour,projet,L'initiative|Le partage|La production
+Enthousiasme,Déplacement,Jacques Tati,figure,Le retournement|Le détournement|Le contournement
+Enthousiasme,Parmi,Langages,pratique,Le dessin|La musique|L'écriture
+Enthousiasme,Parmi,Gadoue,projet,Le réel|L'expérience|La rencontre
+Enthousiasme,Parmi,Edgar Morin,figure,La complexité|L'imperfection|L'émergence
+Enthousiasme,Poésie,Métier,pratique,L'augmentation [+IA]|Le raffinement|La récurrence
+Enthousiasme,Poésie,Réseaux,projet,Le web|L'échange|Le voyage
+Enthousiasme,Poésie,Jim Jarmush,figure,Le quotidien|L'extra ordinaire|Le détail
+Pensée,Croyance,Cosmogonie,pratique,Les peintures de sable|Les mégalithes|Les mandalas
+Pensée,Croyance,Divers,projet,La transversalité|L'articulation|La coordination
+Pensée,Croyance,Vladimir Jankelevitch,figure,L'atemporel|La confiance|L'irréversible
+Pensée,Éducation,Maïeutique,pratique,L'attribut|La valeur|L'indicateur
+Pensée,Éducation,Projet STEAM,projet,La transdisciplinarité|La modélisation|La recherche
+Pensée,Éducation,Gottfried Wilhelm Leibnitz,figure,L'ajustement|L'apprentissage|L'organisation
+Pensée,Actes,Engagement,pratique,La negentropie|L'interprétation|La parole
+Pensée,Actes,Jumelage conventions,projet,Le régional|Le national|L'international
+Pensée,Actes,Daisaku Ikeda,figure,L'inimaginable|L'inattendu|L'inconcevable`;
+
+const MIS_EN_AVANT = new Set(["Démocratie", "Poésie", "Éducation", "Langages"]);
+const REPERES = new Set(["Chambre de commerce", "Calder", "Jacques Tati", "Langages", "Gadoue", "Edgar Morin",
+  "Enthousiasme", "Jim Jarmush", "Éducation", "Gottfried Wilhelm Leibnitz", "Maïeutique"]);
+const ORTHOGRAPHE = {
+  "Jim Jarmush": "Jim Jarmusch",
+  "Gottfried Wilhelm Leibnitz": "Gottfried Wilhelm Leibniz",
+  "Vladimir Jankelevitch": "Vladimir Jankélévitch"
+};
+const DESCRIPTIONS = {
+  "Demain Architecture Laboratory": "Carte mentale du laboratoire, organisée en trois piliers : Jeu(x), Enthousiasme et Pensée. Ils se déclinent en neuf pôles, chacun nourri par des figures, des projets et des pratiques, eux-mêmes résumés en notions clés. Chaque niveau est un anneau que l'on peut faire tourner pour inventer de nouvelles combinaisons.",
+  "Wayne Shorter": "Saxophoniste et compositeur de jazz américain (1933-2023).",
+  "Calder": "Alexander Calder, sculpteur américain, inventeur des mobiles.",
+  "Jacques Tati": "Cinéaste français (Mon Oncle, Playtime).",
+  "Edgar Morin": "Sociologue et philosophe français, penseur de la complexité.",
+  "Jim Jarmush": "Jim Jarmusch, cinéaste américain (Down by Law, Paterson).",
+  "Daisaku Ikeda": "Philosophe bouddhiste et écrivain japonais (1928-2023).",
+  "Gottfried Wilhelm Leibnitz": "Philosophe et mathématicien allemand (1646-1716).",
+  "Vladimir Jankelevitch": "Philosophe et musicologue français (1903-1985), penseur de l'irréversible.",
+  "ENSA Nantes": "École nationale supérieure d'architecture de Nantes.",
+  "Projet STEAM": "Approche croisant sciences, technologie, ingénierie, arts et mathématiques.",
+  "Maïeutique": "Méthode socratique : faire émerger le savoir par le questionnement.",
+  "Cosmogonie": "Récits et représentations de l'origine du monde."
+};
+
+// =====================================================
+// 2. RÉGLAGES (modifiables)
+// =====================================================
+// Ordre des pôles dans le sens des aiguilles d'une montre (garder ensemble les pôles d'un même pilier)
+const ORDRE_POLES = ["Diagramme", "Démocratie", "Chambre de commerce", "Déplacement", "Parmi", "Poésie",
+  "Croyance", "Éducation", "Actes"];
+const DEPART = 160;                       // angle (degrés) où commence le 1er pôle
+const TYPES = {
+  figure:   { label: "Figure inspirante",  court: "Figures",   fill: "#d6e4f0", ink: "#1e2b3a", vif: "#7fb0dd" },
+  projet:   { label: "Projet / terrain",   court: "Projets",   fill: "#f0dcd8", ink: "#a3261d", vif: "#e5786b" },
+  pratique: { label: "Pratique / concept", court: "Pratiques", fill: "#e3cffc", ink: "#8436b8", vif: "#b98ae8" }
+};
+const RAYONS = [0, 200, 390, 640, 752];   // distance au centre de chaque anneau
+const TAILLES = [72, 48, 52, 42, 5];      // rayon des ronds de chaque niveau
+const VITESSE_FLUX = 90;                  // px par seconde
+const DUREE_ETAPE = 5000;                 // visite guidée (ms)
+const DUREE_ROTATION = 420;               // durée d'un cran de rotation (ms)
+const NIVEAUX = ["Laboratoire", "Pilier", "Pôle", "Source d'inspiration", "Notion"];
+const ANNEAUX = ["", "Piliers", "Pôles", "Sources", "Notions"];
+const CLE_NOTES = "dal-notes-v1";
+
+// =====================================================
+// 3. TABLEAU -> ARBRE
+// =====================================================
+const racineData = { name: "Demain Architecture Laboratory", children: [] };
+d3.csvParse(csv).forEach(l => {
+  let p = racineData;
+  [l.pilier, l.pole, l.source].forEach(nom => {
+    nom = nom.trim();
+    let e = p.children.find(c => c.name === nom);
+    if (!e) { e = { name: nom, children: [] }; p.children.push(e); }
+    p = e;
+  });
+  p.type = l.type.trim();
+  p.children = l.notions.split("|").map(n => ({ name: n.trim(), children: [] }));
+});
+const root = d3.hierarchy(racineData, d => d.children && d.children.length ? d.children : null);
+let compteur = 0;
+root.each(d => {
+  d.id = compteur++;
+  d.cle = d.ancestors().reverse().map(a => a.data.name).join(" › ");   // identifiant stable (notes, liens)
+  d.data.repere = d.depth < 4 && REPERES.has(d.data.name);
+  if (d.depth === 3) d.type = d.data.type;
+});
+const tous = root.descendants();
+const parId = new Map(tous.map(d => [d.id, d]));
+const NIV = d3.range(5).map(L => tous.filter(d => d.depth === L));
+const [, , poles, sources, notions] = NIV;
+const normaliser = s => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const rad = deg => deg * Math.PI / 180;
+const mod = (a, n) => ((a % n) + n) % n;
+const signe = (c, n) => c > n / 2 ? c - n : c;
+const ecart = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
+const longueur = d => d.data.name.length * 6;
+const vif = d => d.type ? TYPES[d.type].vif : "var(--accent)";
+const estNouveau = d => d.depth > 0 && d.parent !== d.parentOrigine;
+const descDe = d => DESCRIPTIONS[d.data.name]
+  || (d.depth <= 2 && d.children ? "Regroupe : " + d.children.map(c => c.data.name).join(", ").replace(/, ([^,]*)$/, " et $1") + "." : "");
+
+// =====================================================
+// 4. ANNEAUX : EMPLACEMENTS, ROTATION, LIAISONS
+//    Chaque niveau = un anneau d'emplacements réguliers.
+//    Un rond est relié au rond du niveau précédent qui occupe le secteur correspondant.
+// =====================================================
+const rangPole = n => { const i = ORDRE_POLES.indexOf(n); return i < 0 ? 999 : i; };
+root.children.forEach(p => p.children.sort((a, b) => rangPole(a.data.name) - rangPole(b.data.name)));
+
+const RATIO = [1], N = [1];   // RATIO = emplacements par parent · N = emplacements sur l'anneau
+for (let L = 1; L <= 4; L++) {
+  RATIO[L] = d3.max(NIV[L - 1], d => d.children ? d.children.length : 0) || 1;
+  N[L] = N[L - 1] * RATIO[L];
+}
+root.slot = 0;
+root.eachBefore(d => {
+  if (!d.children) return;
+  const n = d.children.length, dec = Math.floor((RATIO[d.depth + 1] - n) / 2);
+  d.children.forEach((c, k) => c.slot = d.slot * RATIO[d.depth + 1] + dec + k);
+});
+tous.forEach(d => { d.parentOrigine = d.parent; d.r = TAILLES[d.depth]; });
+
+const A0 = rad(DEPART);
+const pas = L => 2 * Math.PI / N[L];
+const rot = [0, 0, 0, 0, 0];     // rotation en cours (radians, pendant un glissement)
+const crans = [0, 0, 0, 0, 0];   // rotation validée (en crans) par rapport à l'origine
+
+function placer() {
+  tous.forEach(d => {
+    if (!d.depth) { d.x = d.y = 0; d.angle = 0; return; }
+    d.angle = A0 + (d.slot + 0.5) * pas(d.depth) + rot[d.depth];
+    d.x = RAYONS[d.depth] * Math.cos(d.angle);
+    d.y = RAYONS[d.depth] * Math.sin(d.angle);
+  });
+}
+function relier() {
+  const occupe = d3.range(5).map(() => new Map());
+  tous.forEach(d => {
+    d.eff = d.depth ? mod(Math.round(d.slot + rot[d.depth] / pas(d.depth)), N[d.depth]) : 0;
+    occupe[d.depth].set(d.eff, d);
+    d.kids = [];
+  });
+  tous.forEach(d => {
+    if (!d.depth) return;
+    let p = occupe[d.depth - 1].get(Math.floor(d.eff / RATIO[d.depth]));
+    if (!p) p = d3.least(NIV[d.depth - 1], q => ecart(q.angle, d.angle));
+    d.parent = p; p.kids.push(d);
+  });
+  tous.forEach(d => {
+    d.kids.sort((a, b) => a.eff - b.eff);
+    if (d.kids.length) d.children = d.kids; else delete d.children;
+  });
+  notions.forEach(n => n.type = n.parent.type);
+  tous.forEach(d => d.nb = d.descendants().filter(n => n.depth === 4).length);
+}
+function segment(d) {
+  const [a, b] = d.depth === 3 ? [d, d.parent] : [d.parent, d];   // les sources pointent vers leur pôle
+  const ang = Math.atan2(b.y - a.y, b.x - a.x);
+  const fin = (d.depth === 2 || d.depth === 3) ? 7 : 0;
+  const ra = a.depth === 0 ? a.r + 6 : a.r;
+  const s = {
+    x1: a.x + ra * Math.cos(ang), y1: a.y + ra * Math.sin(ang),
+    x2: b.x - (b.r + fin) * Math.cos(ang), y2: b.y - (b.r + fin) * Math.sin(ang)
+  };
+  s.len = Math.hypot(s.x2 - s.x1, s.y2 - s.y1) || 1;
+  d.seg = s;
+}
+function enveloppe(p) {
+  const pts = [];
+  const cercle = (x, y, r) => d3.range(12).forEach(i => pts.push([x + r * Math.cos(i * Math.PI / 6), y + r * Math.sin(i * Math.PI / 6)]));
+  cercle(p.x, p.y, p.r + 20);
+  (p.children || []).forEach(s => {
+    cercle(s.x, s.y, s.r + 16);
+    (s.children || []).forEach(f => {
+      cercle(f.x, f.y, 14);
+      const L = RAYONS[4] + f.r + 8 + longueur(f);
+      cercle(L * Math.cos(f.angle), L * Math.sin(f.angle), 12);
+    });
+  });
+  return d3.polygonHull(pts);
+}
+const ligneHull = d3.line().curve(d3.curveCatmullRomClosed.alpha(0.5));
+
+// Résonances : mots partagés (affichées seulement entre branches différentes)
+const VIDES = new Set(["autre", "entre", "avec", "dans", "pour"]);
+const mots = s => normaliser(s).replace(/[^a-z0-9]+/g, " ").trim().split(" ").filter(m => m.length >= 5 && !VIDES.has(m));
+const indexMots = new Map();
+tous.filter(d => d.depth >= 2).forEach(d => new Set(mots(d.data.name)).forEach(m => {
+  if (!indexMots.has(m)) indexMots.set(m, []);
+  indexMots.get(m).push(d);
+}));
+const resonances = [];
+indexMots.forEach((liste, mot) => {
+  for (let i = 0; i < liste.length; i++) for (let j = i + 1; j < liste.length; j++) resonances.push({ a: liste[i], b: liste[j], mot });
+});
+const liee = r => r.a.ancestors().includes(r.b) || r.b.ancestors().includes(r.a) || r.a.parent === r.b.parent;
+const resonancesActives = () => resonances.filter(r => !liee(r));
+
+// =====================================================
+// 5. DESSIN
+// =====================================================
+const chart = document.getElementById("chart");
+const svg = d3.select("#chart").insert("svg", ":first-child");
+const defs = svg.append("defs");
+[["fleche", "#d0402b"], ["fleche-n", "#2ec4b6"]].forEach(([id, c]) => defs.append("marker")
+  .attr("id", id).attr("viewBox", "0 -5 10 10").attr("refX", 2).attr("refY", 0)
+  .attr("markerUnits", "userSpaceOnUse").attr("markerWidth", 14).attr("markerHeight", 14).attr("orient", "auto")
+  .append("path").attr("d", "M0,-5L10,0L0,5Z").attr("fill", c));
+const scene = svg.append("g");
+const cEnclos = scene.append("g");
+const cRails = scene.append("g");
+const cLiens = scene.append("g");
+const cNotions = scene.append("g").attr("class", "couche-notions");
+const cResonances = scene.append("g").attr("class", "couche-resonances");
+const cParticules = scene.append("g").attr("class", "couche-particules");
+const cSources = scene.append("g");
+const cPoles = scene.append("g");
+const cPiliers = scene.append("g");
+const cCentre = scene.append("g");
+
+// --- Glisser pour faire tourner un anneau ---
+let glisse = null, enRotation = false;
+const niveauDe = d => d.niveau ?? d.depth;
+const groupeDe = L => document.getElementById("entrainer").checked ? d3.range(L, 5) : [L];
+const drag = d3.drag()
+  .filter((e, d) => !e.ctrlKey && !e.button && niveauDe(d) > 0)
+  .clickDistance(5)
+  .subject(e => ({ x: e.x, y: e.y }))
+  .on("start", (e, d) => {
+    glisse = enRotation ? null : { L: niveauDe(d), groupe: groupeDe(niveauDe(d)), a: Math.atan2(e.y, e.x), bouge: false };
+  })
+  .on("drag", e => {
+    if (!glisse) return;
+    const a = Math.atan2(e.y, e.x);
+    const da = Math.atan2(Math.sin(a - glisse.a), Math.cos(a - glisse.a));
+    glisse.a = a;
+    if (!glisse.bouge) {
+      glisse.bouge = true; arreterVisite();
+      tooltip.classed("visible", false);
+      document.body.classList.add("tourne-en-cours");
+      railActif(glisse.L);
+    }
+    glisse.groupe.forEach(M => rot[M] += da);
+    maj(); surligner(etatRepos()); indiquer(glisse.L);
+  })
+  .on("end", () => {
+    const g = glisse; glisse = null;
+    document.body.classList.remove("tourne-en-cours");
+    if (!g || !g.bouge) return;
+    const k = Math.round(rot[g.L] / pas(g.L));
+    animer(g.groupe.map(M => ({ M, k: k * N[M] / N[g.L] })), 260);
+  });
+function molette(e, d) {
+  if (!e.shiftKey) return;
+  e.preventDefault(); e.stopPropagation();
+  tourner(niveauDe(d), Math.sign(e.deltaY || e.deltaX) || 1);
+}
+
+function creer(couche, prof, classe) {
+  const g = couche.selectAll("g.noeud").data(NIV[prof]).join("g")
+    .attr("class", d => ["noeud", classe, prof === 3 ? "type-" + d.type : "", prof < 4 && MIS_EN_AVANT.has(d.data.name) ? "accent" : ""].join(" "))
+    .on("mouseenter", survol).on("mousemove", bouger).on("mouseleave", quitter)
+    .on("click", clic);
+  if (prof > 0) g.call(drag).on("wheel.rot", molette);
+  return g;
+}
+function couper(txt, max) {
+  const lignes = []; let c = "";
+  txt.split(" ").forEach(m => {
+    if ((c + " " + m).trim().length > max && c) { lignes.push(c); c = m; }
+    else c = (c + " " + m).trim();
+  });
+  if (c) lignes.push(c);
+  return lignes;
+}
+function texte(g, lignes, lh, cls, fill) {
+  const t = g.append("text").attr("class", "etiquette " + cls).attr("text-anchor", "middle");
+  const y0 = -((lignes.length - 1) * lh) / 2;
+  lignes.forEach((l, i) => t.append("tspan").attr("x", 0).attr("y", y0 + i * lh).attr("dy", "0.35em").text(l));
+  if (fill) t.attr("fill", fill);
+}
+function ajouterBadges(g) {
+  g.append("circle").attr("class", "badge-note")
+    .attr("cx", d => -d.r * .72).attr("cy", d => -d.r * .72).attr("r", d => Math.max(3, d.r * .14));
+  g.filter(d => d.data.repere).append("circle").attr("class", "repere-pt")
+    .attr("cx", d => d.r * .72).attr("cy", d => -d.r * .72).attr("r", 5);
+}
+
+// --- Enclos (recalculés selon les liaisons du moment) ---
+const selEnclos = cEnclos.selectAll("path").data(poles).join("path").attr("class", "enclos");
+
+// --- Rails : on peut attraper l'anneau n'importe où ---
+const gRails = cRails.selectAll("g").data([1, 2, 3, 4].map(L => ({ niveau: L }))).join("g").attr("class", "rail");
+gRails.append("circle").attr("class", "trace").attr("r", d => RAYONS[d.niveau]);
+gRails.append("circle").attr("class", "prise").attr("r", d => RAYONS[d.niveau])
+  .append("title").text(d => `Anneau des ${ANNEAUX[d.niveau].toLowerCase()} : glisser pour faire tourner`);
+gRails.call(drag).on("wheel.rot", molette)
+  .on("mouseenter", (e, d) => railActif(d.niveau)).on("mouseleave", () => { if (!glisse) railActif(null); });
+function railActif(L) { gRails.classed("actif", r => r.niveau === L); }
+
+// --- Liens ---
+const selLiens = cLiens.selectAll("line").data(tous.filter(d => d.depth >= 1 && d.depth < 4)).join("line")
+  .attr("class", d => "lien " + (d.depth === 1 ? "lien-axe" : "lien-fleche"));
+const selLiensNot = cNotions.append("g").selectAll("line").data(notions).join("line")
+  .attr("class", "lien lien-notion");
+
+// --- Résonances ---
+const selReso = cResonances.selectAll("path").data(resonances).join("path").attr("class", "resonance");
+selReso.append("title").text(r => `Résonance : « ${r.mot} »`);
+
+// --- Particules de flux ---
+const fluxData = tous.filter(d => d.depth >= 1 && d.depth <= 3).flatMap(d => [0, .5].map(o => ({ d, o })));
+const gPart = cParticules.selectAll("circle").data(fluxData).join("circle").attr("class", "particule").attr("r", 3.2);
+
+// --- Notions ---
+const gNot = creer(cNotions.append("g"), 4, "notion");
+gNot.append("circle").attr("class", "disque")
+  .attr("fill", "var(--notion-fond)").attr("stroke", "var(--notion)").attr("stroke-width", 1.2);
+const gNotTexte = gNot.append("text").attr("class", "etiquette t-notion").attr("dy", "0.32em").text(d => d.data.name);
+ajouterBadges(gNot);
+
+// --- Sources ---
+const gSrc = creer(cSources, 3, "source");
+gSrc.append("circle").attr("class", "disque")
+  .attr("fill", d => TYPES[d.type].fill).attr("stroke", "#fff").attr("stroke-width", 1.5).attr("stroke-dasharray", "3 2");
+gSrc.each(function (d) { texte(d3.select(this), couper(d.data.name.toUpperCase(), 11), 12.5, "t-source", TYPES[d.type].ink); });
+ajouterBadges(gSrc);
+
+// --- Pôles ---
+const gPol = creer(cPoles, 2, "pole");
+gPol.append("circle").attr("class", "disque")
+  .attr("fill", "#fff").attr("stroke", "#9a9a9a").attr("stroke-width", 1.5).attr("stroke-dasharray", "3 2");
+gPol.each(function (d) { texte(d3.select(this), couper(d.data.name.toUpperCase(), 12), 15, "t-pole"); });
+ajouterBadges(gPol);
+
+// --- Piliers ---
+const gPil = creer(cPiliers, 1, "pilier");
+gPil.append("circle").attr("class", "disque")
+  .attr("fill", "#fff").attr("stroke", "var(--rouge)").attr("stroke-width", 1.5);
+gPil.each(function (d) { texte(d3.select(this), [d.data.name.toUpperCase()], 16, "t-pilier"); });
+ajouterBadges(gPil);
+
+// --- Centre ---
+const gCen = creer(cCentre, 0, "centre");
+gCen.append("circle").attr("class", "disque")
+  .attr("fill", "#f3e600").attr("stroke", "#f3e600").attr("stroke-width", 8).attr("stroke-dasharray", "5 3");
+texte(gCen, ["DEMAIN", "ARCHITECTURE", "LABORATORY"], 16, "t-centre");
+
+const gNoeuds = svg.selectAll(".noeud");
+
+// --- Animation d'apparition ---
+svg.selectAll(".disque").attr("r", 0)
+  .transition().delay(d => d.depth * 200 + (d.id % 12) * 15).duration(800)
+  .ease(d3.easeBackOut.overshoot(1.1)).attr("r", d => d.r);
+svg.selectAll(".etiquette").style("opacity", 0)
+  .transition().delay(d => d.depth * 200 + 450).duration(600).style("opacity", 1);
+svg.selectAll(".lien, .enclos, .resonance").style("opacity", 0)
+  .transition().delay(900).duration(800).style("opacity", null);
+
+// --- Boucle d'animation des flux ---
+const options = { notions: true, flux: true, resonances: true };
+d3.timer(t => {
+  if (!options.flux) return;
+  gPart.each(function (p) {
+    const s = p.d.seg; if (!s) return;
+    const u = ((t / 1000) * VITESSE_FLUX / s.len + p.o) % 1;
+    this.setAttribute("cx", s.x1 + (s.x2 - s.x1) * u);
+    this.setAttribute("cy", s.y1 + (s.y2 - s.y1) * u);
+    this.setAttribute("fill-opacity", Math.sin(Math.PI * u).toFixed(2));
+  });
+});
+
+// =====================================================
+// 6. ZOOM, CADRAGE, MINI-CARTE
+// =====================================================
+const zoom = d3.zoom().scaleExtent([0.15, 5])
+  .filter(e => (!e.ctrlKey || e.type === "wheel") && !e.button && !(e.type === "wheel" && e.shiftKey))
+  .on("zoom", e => {
+    scene.attr("transform", e.transform);
+    svg.classed("loin", e.transform.k < 0.6).classed("tres-loin", e.transform.k < 0.3);
+    majMini(e.transform);
+  });
+svg.call(zoom).on("dblclick.zoom", null);
+
+function cadrer(noeuds, duree = 750) {
+  const { width, height } = chart.getBoundingClientRect();
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  noeuds.forEach(d => {
+    const p = d.r + (d.depth === 4 ? longueur(d) + 14 : 14);
+    x0 = Math.min(x0, d.x - p); x1 = Math.max(x1, d.x + p);
+    y0 = Math.min(y0, d.y - p); y1 = Math.max(y1, d.y + p);
+  });
+  const haut = 80, bas = 120, h = height - haut - bas;
+  const k = Math.min(2.4, width / (x1 - x0), h / (y1 - y0));
+  const t = d3.zoomIdentity.translate(width / 2 - k * (x0 + x1) / 2, haut + h / 2 - k * (y0 + y1) / 2).scale(k);
+  svg.transition().duration(duree).ease(d3.easeCubicInOut).call(zoom.transform, t);
+}
+const zoneDe = d => d.depth === 4 ? d.parent.descendants()
+                  : d.depth === 3 ? [d.parent, ...d.descendants()]
+                  : d.descendants();
+
+const E = RAYONS[4] + 180;
+const mini = d3.select("#minimap").append("svg")
+  .attr("viewBox", `${-E} ${-E} ${2 * E} ${2 * E}`).attr("preserveAspectRatio", "xMidYMid meet");
+const miniEnclos = mini.append("g").selectAll("path").data(poles).join("path").attr("class", "enclos");
+const miniCercles = mini.append("g").selectAll("circle").data(tous.filter(d => d.depth <= 3)).join("circle")
+  .attr("r", d => d.r).attr("fill", d => d.depth === 0 ? "#f3e600" : d.type ? TYPES[d.type].fill : "#fff");
+const miniVue = mini.append("rect").attr("class", "mini-vue");
+function majMini(t) {
+  miniVue.attr("x", -t.x / t.k).attr("y", -t.y / t.k)
+    .attr("width", chart.clientWidth / t.k).attr("height", chart.clientHeight / t.k);
+}
+mini.on("click", e => {
+  const [x, y] = d3.pointer(e, mini.node());
+  svg.transition().duration(500).call(zoom.translateTo, x, y);
+});
+
+// =====================================================
+// 7. MISE À JOUR DE LA CARTE (positions + liaisons)
+// =====================================================
+function maj() {
+  placer();
+  relier();
+  tous.forEach(d => { if (d.depth) segment(d); });
+  poles.forEach(p => p.hull = enveloppe(p));
+  dessiner();
+}
+function dessiner() {
+  gNoeuds.attr("transform", d => `translate(${d.x},${d.y})`);
+  gNotTexte.each(function (d) {
+    const deg = d.angle * 180 / Math.PI, g = Math.cos(d.angle) < 0;
+    this.setAttribute("transform", `rotate(${g ? deg + 180 : deg})`);
+    this.setAttribute("text-anchor", g ? "end" : "start");
+    this.setAttribute("x", g ? -(d.r + 6) : d.r + 6);
+  });
+  [selLiens, selLiensNot].forEach(sel => sel
+    .attr("x1", d => d.seg.x1).attr("y1", d => d.seg.y1).attr("x2", d => d.seg.x2).attr("y2", d => d.seg.y2)
+    .classed("nouveau", estNouveau));
+  selLiens.attr("marker-end", d => d.depth > 1 ? (estNouveau(d) ? "url(#fleche-n)" : "url(#fleche)") : null);
+  selEnclos.attr("d", p => ligneHull(p.hull));
+  selReso.classed("masquee", liee).attr("d", r => {
+    const mx = (r.a.x + r.b.x) / 2 * .45, my = (r.a.y + r.b.y) / 2 * .45;
+    return `M${r.a.x},${r.a.y} Q${mx},${my} ${r.b.x},${r.b.y}`;
+  });
+  miniEnclos.attr("d", p => ligneHull(p.hull));
+  miniCercles.attr("cx", d => d.x).attr("cy", d => d.y);
+}
+
+// --- Rotation animée d'un ou plusieurs anneaux ---
+const indic = d3.select("#indic-rot");
+let minuteurIndic;
+function indiquer(L) {
+  const deg = Math.round(mod((crans[L] * pas(L) + rot[L]) * 180 / Math.PI + 180, 360) - 180);
+  indic.text(`Anneau des ${ANNEAUX[L].toLowerCase()} · ${deg > 0 ? "+" : ""}${deg}°`).classed("visible", true);
+  clearTimeout(minuteurIndic);
+  minuteurIndic = setTimeout(() => indic.classed("visible", false), 1100);
+}
+function valider(M, k) {
+  NIV[M].forEach(d => d.slot = mod(d.slot + k, N[M]));
+  crans[M] = mod(crans[M] + k, N[M]);
+  rot[M] = 0;
+}
+function animer(cibles, duree, suivre = false) {
+  if (enRotation || !cibles.length) return;
+  enRotation = true;
+  const debut = cibles.map(c => rot[c.M]);
+  svg.transition("rotation").duration(duree).ease(d3.easeCubicInOut)
+    .tween("rot", () => t => {
+      cibles.forEach((c, i) => rot[c.M] = debut[i] + (c.k * pas(c.M) - debut[i]) * t);
+      maj(); surligner(etatRepos());
+      if (cibles.length < 4) indiquer(cibles[0].M);
+    })
+    .on("end", () => {
+      cibles.forEach(c => valider(c.M, c.k));
+      enRotation = false;
+      maj(); apresRotation();
+      if (suivre && selection) cadrer(zoneDe(selection));
+    });
+}
+function tourner(L, sens, suivre = false) {
+  if (glisse || L < 1) return;
+  arreterVisite();
+  animer(groupeDe(L).map(M => ({ M, k: sens * N[M] / N[L] })), DUREE_ROTATION, suivre);
+}
+function melanger() {
+  arreterVisite();
+  animer([1, 2, 3, 4].map(M => ({ M, k: Math.floor(Math.random() * N[M]) - Math.floor(N[M] / 2) })), 1200);
+}
+function origine() {
+  arreterVisite();
+  animer([1, 2, 3, 4].filter(M => crans[M]).map(M => ({ M, k: -signe(crans[M], N[M]) })), 900);
+}
+function apresRotation() {
+  majAnneaux();
+  appliquerFiltre();
+  railActif(null);
+  if (trouves.length) recherche = new Set(trouves.flatMap(d => d.ancestors()));
+  if (cheminAB) tracerChemin(cheminAB[0], cheminAB[1], false);
+  else { surligner(etatRepos()); rafraichirPanneau(); }
+  majHash(selection);
+}
+
+// =====================================================
+// 8. INTERACTIONS
+// =====================================================
+const tooltip = d3.select("#tooltip");
+const panneau = d3.select("#panneau");
+let selection = null, recherche = null, chemin = null, cheminAB = null, vue = "ensemble";
+const typesActifs = new Set(Object.keys(TYPES));
+
+function famille(d) {
+  const s = new Set([...d.ancestors(), ...d.descendants()]);
+  if (d.depth === 4) d.parent.children.forEach(f => s.add(f));
+  return s;
+}
+const etatRepos = () => recherche || chemin || (selection ? famille(selection) : null);
+function surligner(ens) {
+  const lienOk = d => ens.has(d) && ens.has(d.parent);
+  gNoeuds.classed("attenue", d => ens ? !ens.has(d) : false);
+  svg.selectAll(".lien").classed("attenue", d => ens ? !lienOk(d) : false);
+  gPart.classed("attenue", p => ens ? !lienOk(p.d) : false);
+  selReso.classed("attenue", r => ens ? !(ens.has(r.a) || ens.has(r.b)) : false);
+  selEnclos.classed("attenue", p => ens ? !ens.has(p) : false);
+}
+
+function survol(event, d) {
+  if ((glisse && glisse.bouge) || enRotation) return;
+  surligner(famille(d));
+  if (d.depth) railActif(d.depth);
+  const fil = d.ancestors().reverse().slice(1, -1).map(a => a.data.name).join(" › ");
+  const desc = descDe(d), note = NOTES[d.cle];
+  tooltip.html(`
+    <div class="tt-niveau" style="color:${vif(d)}">${NIVEAUX[d.depth]}${d.depth === 3 ? " · " + TYPES[d.type].label : ""}</div>
+    <div class="tt-nom">${esc(d.data.name)}</div>
+    ${fil ? `<div class="tt-chemin">${esc(fil)}</div>` : ""}
+    ${estNouveau(d) ? `<div class="tt-nouveau">↻ À l'origine : ${esc(d.parentOrigine.data.name)}</div>` : ""}
+    ${d.depth === 3 ? `<div class="tt-notions">${(d.children || []).map(n => esc(n.data.name)).join(" · ")}</div>`
+      : d.children ? `<div class="tt-chemin" style="margin-top:4px"><b>${d.nb}</b> notions</div>` : ""}
+    ${desc ? `<div class="tt-desc">${esc(desc)}</div>` : ""}
+    ${note ? `<div class="tt-note">✎ ${esc(note.slice(0, 140))}${note.length > 140 ? "…" : ""}</div>` : ""}
+    ${d.depth ? `<div class="tt-astuce">↻ Glisser pour faire tourner l'anneau des ${ANNEAUX[d.depth].toLowerCase()}</div>` : ""}
+  `).classed("visible", true);
+  bouger(event);
+}
+function bouger(event) {
+  const [x, y] = d3.pointer(event, chart);
+  tooltip.style("left", (x > chart.clientWidth - 320 ? x - 305 : x + 18) + "px")
+         .style("top", (y > chart.clientHeight - 220 ? y - 170 : y + 18) + "px");
+}
+function quitter() {
+  if ((glisse && glisse.bouge) || enRotation) return;
+  surligner(etatRepos()); tooltip.classed("visible", false); railActif(null);
+}
+
+function clic(event, d) {
+  event.stopPropagation();
+  arreterVisite();
+  if (event.shiftKey && selection && d !== selection) { tracerChemin(selection, d); return; }
+  selectionner(d);
+}
+function selectionner(d, cadrage = true) {
+  if (d.depth === 0) { reinitialiser(); return; }
+  selection = d; chemin = null; cheminAB = null;
+  gNoeuds.classed("choisi", n => n === d);
+  svg.selectAll(".lien").classed("sur-chemin", false);
+  panneauDetail(d);
+  surligner(etatRepos());
+  if (cadrage) cadrer(zoneDe(d));
+  majHash(d);
+}
+function reinitialiser() {
+  selection = null; chemin = null; cheminAB = null;
+  gNoeuds.classed("choisi", false);
+  svg.selectAll(".lien").classed("sur-chemin", false);
+  surligner(etatRepos());
+  panneauEnsemble();
+  cadrer(tous);
+  majHash(null);
+}
+svg.on("click", e => { if (e.target === svg.node()) { arreterVisite(); reinitialiser(); } });
+
+// --- Chemin entre deux éléments (Shift + clic) ---
+function tracerChemin(a, b, cadrage = true) {
+  const etapes = a.path(b);
+  chemin = new Set(etapes); cheminAB = [a, b];
+  gNoeuds.classed("choisi", n => n === a || n === b);
+  svg.selectAll(".lien").classed("sur-chemin", d => chemin.has(d) && chemin.has(d.parent));
+  surligner(chemin);
+  panneauChemin(a, b, etapes);
+  if (cadrage) cadrer(etapes);
+}
+
+// --- Lien partageable : #crans/élément ---
+function majHash(d) {
+  const tourne = crans.some(Boolean);
+  let h = tourne ? crans.slice(1).join(".") : "";
+  if (d) h += (tourne ? "/" : "") + encodeURIComponent(d.cle);
+  try { history.replaceState(null, "", h ? "#" + h : location.pathname + location.search); } catch (e) {}
+}
+function lireHash() {
+  const h = location.hash.slice(1);
+  if (!h) return {};
+  try {
+    const m = h.match(/^(\d+\.\d+\.\d+\.\d+)(?:\/(.*))?$/);
+    if (m) return { crans: m[1].split(".").map(Number), cle: m[2] ? decodeURIComponent(m[2]) : null };
+    return { cle: decodeURIComponent(h) };
+  } catch (e) { return {}; }
+}
+
+// --- Filtres par type ---
+const pilTypes = d3.select("#pilules-types").selectAll("button").data(Object.entries(TYPES)).join("button")
+  .attr("class", "pilule").html(([k, t]) => `<span class="pastille" style="background:${t.fill}"></span>${t.court}`)
+  .on("click", (e, [k]) => { typesActifs.has(k) ? typesActifs.delete(k) : typesActifs.add(k); appliquerFiltre(); });
+function appliquerFiltre() {
+  const off = d => d && d.type && !typesActifs.has(d.type);
+  gNoeuds.classed("filtre", off);
+  svg.selectAll(".lien").classed("filtre", off);
+  gPart.classed("filtre", p => off(p.d));
+  selReso.classed("filtre", r => off(r.a) || off(r.b));
+  pilTypes.classed("off-type", ([k]) => !typesActifs.has(k));
+}
+function isolerType(k) {
+  const seul = typesActifs.size === 1 && typesActifs.has(k);
+  typesActifs.clear();
+  (seul ? Object.keys(TYPES) : [k]).forEach(t => typesActifs.add(t));
+  appliquerFiltre();
+}
+
+// --- Commandes des anneaux ---
+const lignesAnneaux = d3.select("#anneaux-lignes").selectAll("div").data([1, 2, 3, 4]).join("div")
+  .attr("class", "an-ligne")
+  .html(L => `<span class="an-nom">${ANNEAUX[L]}</span>
+    <button data-s="-1" title="Tourner d'un cran (sens inverse)">↺</button>
+    <span class="an-crans"></span>
+    <button data-s="1" title="Tourner d'un cran">↻</button>`)
+  .on("mouseenter", (e, L) => railActif(L)).on("mouseleave", () => railActif(null));
+lignesAnneaux.selectAll("button").on("click", function () {
+  tourner(d3.select(this.parentNode).datum(), +this.dataset.s);
+});
+function majAnneaux() {
+  lignesAnneaux.classed("tourne", L => crans[L] !== 0)
+    .select(".an-crans").text(L => {
+      const deg = Math.round(signe(crans[L], N[L]) * 360 / N[L]);
+      return `${deg > 0 ? "+" : ""}${deg}°`;
+    });
+}
+d3.select("#melanger").on("click", melanger);
+d3.select("#origine").on("click", origine);
+
+// =====================================================
+// 9. NOTES PERSONNELLES (enregistrées dans le navigateur)
+// =====================================================
+let NOTES = {};
+try { NOTES = JSON.parse(localStorage.getItem(CLE_NOTES)) || {}; } catch (e) {}
+const sauverNotes = () => { try { localStorage.setItem(CLE_NOTES, JSON.stringify(NOTES)); } catch (e) {} };
+const majBadges = () => gNoeuds.classed("annote", d => !!NOTES[d.cle]);
+function exporterNotes() {
+  const blob = new Blob([JSON.stringify(NOTES, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = "notes-demain-architecture-laboratory.json"; a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// =====================================================
+// 10. PANNEAU LATÉRAL
+// =====================================================
+function bulle(d, taille = 9) {
+  const fill = d.depth === 4 ? "var(--notion-fond)" : d.type ? TYPES[d.type].fill : "#fff";
+  const stroke = d.depth === 4 ? "var(--notion)" : d.depth <= 2 ? "#d0402b" : "#fff";
+  return `<svg width="24" height="24" style="flex-shrink:0"><circle cx="12" cy="12" r="${taille}" fill="${fill}" stroke="${stroke}" stroke-width="1.2"/></svg>`;
+}
+const marqueNv = d => estNouveau(d) ? `<em class="nv" title="Nouvelle liaison">↻</em>` : "";
+function rafraichirPanneau() {
+  if (vue === "detail" && selection) panneauDetail(selection);
+  else if (vue === "index") panneauIndex();
+  else if (vue === "ensemble") panneauEnsemble();
+}
+function brancher() {
+  panneau.selectAll("[data-id]").on("click", function () { arreterVisite(); selectionner(parId.get(+this.dataset.id)); });
+  panneau.selectAll("[data-type]").on("click", function () { isolerType(this.dataset.type); });
+  panneau.selectAll("[data-tour]").on("click", function () { tourner(+this.dataset.niv, +this.dataset.tour, true); });
+  panneau.selectAll(".retour").on("click", () => { arreterVisite(); reinitialiser(); });
+  panneau.select("#ouvrir-index").on("click", panneauIndex);
+  panneau.select("#exporter").on("click", exporterNotes);
+  panneau.select("#p-melanger").on("click", melanger);
+  panneau.select("#p-origine").on("click", origine);
+  panneau.select("#copier").on("click", function () {
+    const btn = this, ok = () => { btn.textContent = "Lien copié ✓"; };
+    if (navigator.clipboard) navigator.clipboard.writeText(location.href).then(ok, () => prompt("Copiez ce lien :", location.href));
+    else prompt("Copiez ce lien :", location.href);
+  });
+}
+
+function panneauEnsemble() {
+  vue = "ensemble";
+  const parfaits = poles.filter(p => Object.keys(TYPES).every(k => (p.children || []).filter(s => s.type === k).length === 1)).length;
+  const nouveaux = tous.filter(estNouveau).length;
+  const tourne = crans.some(Boolean);
+  const reso = resonancesActives();
+  const nbNotes = Object.keys(NOTES).length;
+  panneau.html(`
+    <div class="kicker" style="color:var(--accent)">Carte mentale</div>
+    <h2>Demain Architecture Laboratory</h2>
+    <p>${DESCRIPTIONS["Demain Architecture Laboratory"]}</p>
+    <div class="chiffres">
+      <div><b>${root.children.length}</b><span>piliers</span></div>
+      <div><b>${poles.length}</b><span>pôles</span></div>
+      <div><b>${sources.length}</b><span>sources</span></div>
+      <div><b>${notions.length}</b><span>notions</span></div>
+    </div>
+    ${tourne
+      ? `<div class="insight nouv">↻ Disposition modifiée : <b>${nouveaux}</b> liaison(s) différente(s) de la carte d'origine (en turquoise).</div>`
+      : `<div class="insight">Disposition d'origine. Faites tourner un anneau pour créer de nouvelles combinaisons.</div>`}
+    ${parfaits === poles.length
+      ? `<div class="insight">Structure symétrique : chaque pôle croise exactement <b>une figure</b>, <b>un projet</b> et <b>une pratique</b>.</div>`
+      : `<div class="insight"><b>${parfaits}/${poles.length}</b> pôles réunissent encore une figure, un projet et une pratique.</div>`}
+    ${reso.length ? `<div class="insight">${reso.length} résonance(s) entre branches différentes : ${[...new Set(reso.map(r => "« " + r.mot + " »"))].join(", ")}.</div>` : ""}
+    <h3>Combinaison</h3>
+    <div class="actions">
+      <button class="bouton" id="p-melanger">⟳ Mélanger</button>
+      <button class="bouton" id="p-origine" ${tourne ? "" : "disabled style='opacity:.4'"}>Revenir à l'origine</button>
+      <button class="bouton" id="copier">Copier le lien de cette disposition</button>
+    </div>
+    <h3>Matrice pôles × types</h3>
+    <table class="matrice">
+      <tr><th></th>${Object.entries(TYPES).map(([k, t]) => `<th data-type="${k}" style="color:${t.vif}" title="Isoler ce type">${t.court}</th>`).join("")}</tr>
+      ${root.children.map(pi => `
+        <tr class="pil"><td colspan="4" data-id="${pi.id}">${esc(pi.data.name)}</td></tr>
+        ${(pi.children || []).map(p => `<tr>
+          <td class="pol ${estNouveau(p) ? "change" : ""}" data-id="${p.id}">${esc(p.data.name)}</td>
+          ${Object.keys(TYPES).map(k => {
+            const s = (p.children || []).filter(c => c.type === k);
+            return `<td ${s[0] ? `data-id="${s[0].id}"` : ""} class="${s.some(estNouveau) ? "change" : ""}" style="color:${TYPES[k].vif}">${s.map(c => esc(c.data.name)).join(", ") || "—"}</td>`;
+          }).join("")}
+        </tr>`).join("")}`).join("")}
+    </table>
+    <h3>Outils</h3>
+    <div class="actions">
+      <button class="bouton" id="ouvrir-index">Index des notions A–Z</button>
+      <button class="bouton" id="exporter" ${nbNotes ? "" : "disabled style='opacity:.4'"}>Exporter mes notes (${nbNotes})</button>
+    </div>
+    <h3>Lecture</h3>
+    <div class="legende">
+      <svg width="34" height="34"><circle cx="17" cy="17" r="13" fill="#f3e600" stroke="#f3e600" stroke-width="3" stroke-dasharray="3 2"/></svg><span>Laboratoire (centre fixe)</span>
+      <svg width="34" height="34"><circle cx="17" cy="17" r="12" fill="#fff" stroke="#d0402b" stroke-width="1.5"/></svg><span>Pilier · pôle</span>
+      ${Object.entries(TYPES).map(([k, t]) => `<svg width="34" height="34"><circle cx="17" cy="17" r="11" fill="${t.fill}" stroke="#fff" stroke-dasharray="3 2"/></svg><span>${t.label}</span>`).join("")}
+      <svg width="34" height="34"><circle cx="17" cy="17" r="5" fill="var(--notion-fond)" stroke="var(--notion)" stroke-width="1.2"/></svg><span>Notion (visible en zoomant)</span>
+      <svg width="34" height="34"><circle cx="17" cy="17" r="14" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="2 5"/></svg><span>Anneau : se fait tourner autour du centre</span>
+      <svg width="34" height="34"><line x1="3" y1="17" x2="24" y2="17" stroke="#d0402b" stroke-width="3" stroke-dasharray="2.5 2"/><path d="M24,11L32,17L24,23Z" fill="#d0402b"/></svg><span>Liaison d'origine</span>
+      <svg width="34" height="34"><line x1="3" y1="17" x2="24" y2="17" stroke="#2ec4b6" stroke-width="3" stroke-dasharray="2.5 2"/><path d="M24,11L32,17L24,23Z" fill="#2ec4b6"/></svg><span>Nouvelle liaison (après rotation)</span>
+      <svg width="34" height="34"><path d="M4,26 Q17,4 30,26" fill="none" stroke="var(--accent)" stroke-width="1.6" stroke-dasharray="1 5" stroke-linecap="round"/></svg><span>Résonance : mot partagé</span>
+      <svg width="34" height="34"><circle cx="17" cy="17" r="5" fill="#fff" stroke="#777" stroke-width="1.2"/></svg><span>Repère de la carte d'origine</span>
+      <svg width="34" height="34"><circle cx="17" cy="17" r="5" fill="var(--accent)"/></svg><span>Élément annoté par vous</span>
+    </div>
+    <h3>Navigation</h3>
+    <ul class="aide">
+      <li><b>Glisser</b> un rond ou un anneau : le faire tourner</li>
+      <li><kbd>Maj</kbd> + molette sur un rond : tourner d'un cran</li>
+      <li><kbd>Maj</kbd> + <kbd>←</kbd> <kbd>→</kbd> : tourner l'anneau de l'élément choisi</li>
+      <li><kbd>M</kbd> mélanger · <kbd>O</kbd> revenir à l'origine</li>
+      <li>Survol : isoler une branche · Clic : zoom + fiche</li>
+      <li><kbd>Maj</kbd> + clic : chemin entre deux éléments</li>
+      <li><kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd> : parcourir l'arborescence</li>
+      <li><kbd>/</kbd> rechercher · <kbd>V</kbd> visite guidée · <kbd>Échap</kbd> revenir</li>
+    </ul>`);
+  brancher();
+}
+
+function panneauDetail(d) {
+  vue = "detail";
+  const c = vif(d);
+  const enfants = d.children || [];
+  const freres = d.depth >= 1 ? d.parent.children.filter(f => f !== d) : [];
+  const desc = descDe(d), ortho = ORTHOGRAPHE[d.data.name];
+  const reso = resonancesActives().filter(r => r.a === d || r.b === d);
+  const pct = Math.round(d.nb / root.nb * 100) + "%";
+  const chiffres = d.depth === 1 ? [[enfants.length, "pôles"], [d.descendants().filter(n => n.depth === 3).length, "sources"], [d.nb, "notions"]]
+                 : d.depth === 2 ? [[enfants.length, "sources"], [d.nb, "notions"], [pct, "du total"]]
+                 : d.depth === 3 ? [[d.nb, "notions"], [pct, "du total"]] : [];
+  panneau.html(`
+    <div class="kicker" style="color:${c}">${NIVEAUX[d.depth]}${d.depth === 3 ? " · " + TYPES[d.type].label : ""}</div>
+    <h2 style="color:${c}">${esc(d.data.name)}</h2>
+    <div class="fil">${d.ancestors().reverse().map(a => `<a data-id="${a.id}">${esc(a.data.name)}</a>`).join(" › ")}</div>
+    ${desc ? `<p>${esc(desc)}</p>` : ""}
+    ${estNouveau(d) ? `<div class="insight nouv">↻ Dans cette disposition, rattaché à <b>${esc(d.parent.data.name)}</b>. À l'origine : « ${esc(d.parentOrigine.data.name)} ».</div>` : ""}
+    ${ortho ? `<div class="alerte">Orthographe usuelle : <b>${ortho}</b>. Libellé conservé tel quel depuis la carte d'origine.</div>` : ""}
+    ${d.data.repere ? `<div class="insight">○ Cet élément porte un repère sur la carte d'origine.</div>` : ""}
+    ${chiffres.length ? `<div class="chiffres">${chiffres.map(([v, l]) => `<div><b>${v}</b><span>${l}</span></div>`).join("")}</div>` : ""}
+    ${d.depth <= 2 && enfants.length ? `
+      <h3>Contenu</h3>
+      ${enfants.map(e => `<div class="ligne" data-id="${e.id}">${bulle(e)}<span>${esc(e.data.name)}${marqueNv(e)}</span><b>${e.depth === 3 ? TYPES[e.type].court.slice(0, -1) : e.nb + " notions"}</b></div>`).join("")}` : ""}
+    ${d.depth === 2 ? `<h3>Notions du pôle</h3><div class="puces">${d.descendants().filter(n => n.depth === 4).map(n => `<span class="puce" data-id="${n.id}">${esc(n.data.name)}</span>`).join("")}</div>` : ""}
+    ${d.depth === 3 ? `<h3>Notions clés</h3><div class="puces">${enfants.map(n => `<span class="puce" data-id="${n.id}">${esc(n.data.name)}</span>`).join("") || "<p>Aucune notion dans cette disposition.</p>"}</div>` : ""}
+    ${freres.length ? `
+      <h3>Aussi dans « ${esc(d.parent.data.name)} »</h3>
+      ${freres.map(f => `<div class="ligne" data-id="${f.id}">${bulle(f)}<span>${esc(f.data.name)}${marqueNv(f)}</span>${f.type && d.depth === 3 ? `<b>${TYPES[f.type].court.slice(0, -1)}</b>` : ""}</div>`).join("")}` : ""}
+    ${reso.length ? `
+      <h3>Résonances</h3>
+      ${reso.map(r => { const o = r.a === d ? r.b : r.a; return `<div class="ligne" data-id="${o.id}">${bulle(o)}<span>${esc(o.data.name)}<small>${esc(o.parent.data.name)}</small></span><b>« ${r.mot} »</b></div>`; }).join("")}` : ""}
+    <h3>Anneau des ${ANNEAUX[d.depth].toLowerCase()}</h3>
+    <div class="actions">
+      <button class="bouton" data-tour="-1" data-niv="${d.depth}">↺ Tourner</button>
+      <button class="bouton" data-tour="1" data-niv="${d.depth}">Tourner ↻</button>
+    </div>
+    <h3>Mes notes</h3>
+    <textarea id="note" placeholder="Vos remarques sur « ${esc(d.data.name)} » (enregistrées dans ce navigateur)…"></textarea>
+    <div class="actions"><button class="bouton" id="copier">Copier le lien vers cette fiche</button></div>
+    <p class="astuce">Astuce : Maj + clic sur un autre élément pour tracer le chemin qui les relie.</p>
+    <button class="retour">← Vue d'ensemble</button>`);
+  panneau.select("#note").property("value", NOTES[d.cle] || "").on("input", function () {
+    if (this.value.trim()) NOTES[d.cle] = this.value; else delete NOTES[d.cle];
+    sauverNotes(); majBadges();
+  });
+  brancher();
+}
+
+function panneauChemin(a, b, etapes) {
+  vue = "chemin";
+  panneau.html(`
+    <div class="kicker" style="color:var(--accent)">Chemin · ${etapes.length - 1} liaison(s)</div>
+    <h2>${esc(a.data.name)} <span style="color:var(--gris)">→</span> ${esc(b.data.name)}</h2>
+    <p>Ces deux éléments se rejoignent par
+      <b>${esc(etapes.reduce((m, n) => n.depth < m.depth ? n : m).data.name)}</b>, leur ancêtre commun le plus proche dans la disposition actuelle.</p>
+    <h3>Étapes</h3>
+    ${etapes.map((n, i) => `
+      ${i ? `<div class="fleche-bas">↓</div>` : ""}
+      <div class="etape" data-id="${n.id}">${bulle(n)}<span>${esc(n.data.name)}</span><i>${NIVEAUX[n.depth]}</i></div>`).join("")}
+    <p class="astuce">Faites tourner un anneau : le chemin se recalcule automatiquement.</p>
+    <button class="retour">← Vue d'ensemble</button>`);
+  brancher();
+}
+
+function panneauIndex() {
+  arreterVisite();
+  vue = "index";
+  const sansArticle = s => normaliser(s).replace(/^(l'|le |la |les )/, "");
+  const items = notions.slice().sort((x, y) => sansArticle(x.data.name).localeCompare(sansArticle(y.data.name)));
+  const groupes = d3.groups(items, n => sansArticle(n.data.name)[0].toUpperCase());
+  panneau.html(`
+    <div class="kicker" style="color:var(--accent)">Glossaire</div>
+    <h2>Index des notions</h2>
+    <p>Les ${notions.length} notions de la carte, classées par ordre alphabétique (sans l'article). Cliquez pour les situer.</p>
+    ${groupes.map(([l, ns]) => `
+      <div class="lettre">${l}</div>
+      ${ns.map(n => `<div class="ligne" data-id="${n.id}">${bulle(n, 5)}<span>${esc(n.data.name)}${marqueNv(n)}<small>${esc(n.parent.data.name)}</small></span></div>`).join("")}`).join("")}
+    <button class="retour">← Vue d'ensemble</button>`);
+  brancher();
+}
+
+// =====================================================
+// 11. RECHERCHE
+// =====================================================
+const champ = document.getElementById("recherche");
+const listeRes = d3.select("#resultats");
+let trouves = [];
+function effacerRecherche() {
+  champ.value = ""; recherche = null; trouves = [];
+  gNoeuds.classed("trouve", false);
+  d3.select("#nb").text(""); listeRes.classed("ouvert", false).html("");
+}
+champ.addEventListener("input", () => {
+  const q = normaliser(champ.value.trim());
+  gNoeuds.classed("trouve", false);
+  if (q.length < 2) { recherche = null; trouves = []; d3.select("#nb").text(""); listeRes.classed("ouvert", false); surligner(etatRepos()); return; }
+  trouves = tous.filter(d => d.depth > 0 && normaliser(d.data.name).includes(q))
+    .sort((a, b) => normaliser(a.data.name).indexOf(q) - normaliser(b.data.name).indexOf(q) || a.depth - b.depth);
+  recherche = new Set(trouves.flatMap(d => d.ancestors()));
+  gNoeuds.classed("trouve", d => trouves.includes(d));
+  d3.select("#nb").text(`${trouves.length} résultat${trouves.length > 1 ? "s" : ""}`);
+  listeRes.classed("ouvert", trouves.length > 0).selectAll("li").data(trouves.slice(0, 10)).join("li")
+    .html(d => `${esc(d.data.name)}<small>${NIVEAUX[d.depth]} · ${esc(d.ancestors().reverse().slice(1, -1).map(a => a.data.name).join(" › ") || "—")}</small>`)
+    .on("mousedown", (e, d) => { e.preventDefault(); effacerRecherche(); arreterVisite(); selectionner(d); champ.blur(); });
+  surligner(recherche);
+  if (trouves.length) cadrer(trouves);
+});
+champ.addEventListener("keydown", e => {
+  if (e.key === "Enter" && trouves[0]) { const d = trouves[0]; effacerRecherche(); arreterVisite(); selectionner(d); champ.blur(); }
+});
+champ.addEventListener("blur", () => setTimeout(() => listeRes.classed("ouvert", false), 150));
+champ.addEventListener("focus", () => listeRes.classed("ouvert", trouves.length > 0));
+
+// =====================================================
+// 12. VISITE GUIDÉE
+// =====================================================
+const btnVisite = d3.select("#visite");
+const barre = document.getElementById("progression");
+let visite = null, etape = 0, ETAPES = [];
+function relancerBarre() {
+  barre.style.transition = "none"; barre.style.width = "0";
+  void barre.offsetWidth;
+  barre.style.transition = `width ${DUREE_ETAPE}ms linear`; barre.style.width = "100%";
+}
+function pasVisite() {
+  const d = ETAPES[etape];
+  d.depth === 0 ? reinitialiser() : selectionner(d);
+  btnVisite.text(`❚❚ Visite ${etape + 1}/${ETAPES.length}`).classed("on", true);
+  relancerBarre();
+  etape = (etape + 1) % ETAPES.length;
+}
+function lancerVisite() {
+  ETAPES = [root, ...root.children.flatMap(p => [p, ...(p.children || [])])];   // suit la disposition actuelle
+  etape = Math.max(0, ETAPES.indexOf(selection));
+  pasVisite();
+  visite = setInterval(pasVisite, DUREE_ETAPE);
+}
+function arreterVisite() {
+  if (!visite) return;
+  clearInterval(visite); visite = null;
+  btnVisite.text("▶ Visite guidée").classed("on", false);
+  barre.style.transition = "none"; barre.style.width = "0";
+}
+btnVisite.on("click", () => visite ? arreterVisite() : lancerVisite());
+
+// =====================================================
+// 13. OPTIONS, THÈME, ZOOM, CLAVIER
+// =====================================================
+d3.selectAll(".pilule[data-opt]").on("click", function () {
+  const opt = this.dataset.opt, on = this.classList.toggle("on");
+  options[opt] = on;
+  svg.classed(`sans-${opt}`, !on);
+});
+d3.select("#index").on("click", panneauIndex);
+d3.select("#recentrer").on("click", () => { arreterVisite(); effacerRecherche(); reinitialiser(); });
+d3.select("#theme").on("click", function () {
+  const nuit = document.body.classList.toggle("nuit");
+  document.body.classList.toggle("jour", !nuit);
+  this.textContent = nuit ? "☀ Jour" : "☾ Nuit";
+});
+d3.select("#zplus").on("click", () => svg.transition().duration(300).call(zoom.scaleBy, 1.4));
+d3.select("#zmoins").on("click", () => svg.transition().duration(300).call(zoom.scaleBy, 1 / 1.4));
+
+document.addEventListener("keydown", e => {
+  const tag = e.target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA") {
+    if (e.key === "Escape") { e.target.blur(); if (e.target === champ) { effacerRecherche(); surligner(etatRepos()); } }
+    return;
+  }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  if (e.key === "/") { e.preventDefault(); champ.focus(); return; }
+  if (k === "v") { visite ? arreterVisite() : lancerVisite(); return; }
+  if (k === "m") { melanger(); return; }
+  if (k === "o") { origine(); return; }
+  if (e.key === "Escape") { arreterVisite(); effacerRecherche(); reinitialiser(); return; }
+  if (!e.key.startsWith("Arrow")) return;
+  e.preventDefault(); arreterVisite();
+  const d = selection;
+  if (e.shiftKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+    if (d) tourner(d.depth, e.key === "ArrowRight" ? 1 : -1, true);
+    return;
+  }
+  if (!d) { selectionner(root.children[0]); return; }
+  if (e.key === "ArrowUp") selectionner(d.parent);
+  else if (e.key === "ArrowDown" && d.children) selectionner(d.children[0]);
+  else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+    const f = d.parent.children, i = f.indexOf(d), p = e.key === "ArrowRight" ? 1 : -1;
+    selectionner(f[(i + p + f.length) % f.length]);
+  }
+});
+window.addEventListener("resize", () => cadrer(selection ? zoneDe(selection) : tous, 0));
+
+// =====================================================
+// 14. LANCEMENT
+// =====================================================
+const depart = lireHash();
+if (depart.crans) depart.crans.forEach((c, i) => valider(i + 1, mod(c, N[i + 1])));
+maj();
+majAnneaux();
+panneauEnsemble();
+appliquerFiltre();
+majBadges();
+cadrer(tous, 0);
+const cible = depart.cle && tous.find(d => d.cle === depart.cle);
+if (cible) setTimeout(() => selectionner(cible), 1200);
+else if (depart.crans) majHash(null);
+</script>
+</body>
+</html>

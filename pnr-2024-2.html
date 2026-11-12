@@ -1,0 +1,1492 @@
+<!DOCTYPE html>
+<!-- ===== PARTIE 1/4 : STRUCTURE + STYLE ===== -->
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PNR 2024 — Singularités des territoires</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<style>
+:root{
+  --papier:#f7f5f0; --encre:#1f2a2c; --canard:#2e7c86; --gris:#6b7477;
+  --ligne:rgba(31,42,44,.12); --voile:rgba(255,255,255,.62);
+  --nav:250px; --rayon:18px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--papier);color:var(--encre);font:16px/1.55 Barlow,system-ui,sans-serif}
+h1,h2,h3{font-family:"Barlow Condensed",sans-serif;color:var(--canard);line-height:1.05;margin:0}
+a{color:var(--canard)}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--canard);outline-offset:3px}
+
+/* ---------- Barre de progression + navigation ---------- */
+#progression{position:fixed;top:0;left:0;height:3px;width:0;background:var(--canard);z-index:60}
+#nav{position:fixed;top:0;bottom:0;left:0;width:var(--nav);padding:28px 20px;border-right:1px solid var(--ligne);
+     background:var(--papier);overflow:auto;z-index:50;display:flex;flex-direction:column;gap:18px}
+.marque{font:700 13px "Barlow Condensed";letter-spacing:.16em;text-transform:uppercase;color:var(--gris)}
+.marque b{display:block;font-size:28px;letter-spacing:.02em;color:var(--canard);text-transform:none}
+#nav-filtre{width:100%;padding:8px 12px;border:1px solid var(--ligne);border-radius:999px;background:#fff;font-size:14px}
+#nav ol{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+#nav a{display:flex;gap:10px;align-items:baseline;padding:7px 10px;border-radius:10px;text-decoration:none;color:var(--encre);font-size:15px}
+#nav a span{font:600 12px "Barlow Condensed";color:var(--gris);min-width:20px}
+#nav a:hover{background:rgba(46,124,134,.08)}
+#nav a.actif{background:var(--canard);color:#fff}
+#nav a.actif span{color:#cfe8eb}
+.nav-pied{margin-top:auto;font-size:12px;color:var(--gris)}
+#burger{display:none;position:fixed;top:12px;left:12px;z-index:70;width:44px;height:44px;border-radius:50%;
+        border:1px solid var(--ligne);background:#fff;cursor:pointer;font-size:20px}
+
+/* ---------- Sections ---------- */
+main{margin-left:var(--nav)}
+.section{padding:clamp(40px,6vw,80px) clamp(18px,4vw,56px);border-bottom:1px solid var(--ligne)}
+.tete{position:relative;isolation:isolate;max-width:860px;margin-bottom:28px}
+.tete::before{content:"";position:absolute;z-index:-1;width:150px;height:150px;border-radius:50%;
+              background:var(--c,#9cdeec);opacity:.45;mix-blend-mode:multiply;left:-50px;top:-40px}
+.kicker{font:700 13px "Barlow Condensed";letter-spacing:.16em;text-transform:uppercase;color:var(--gris)}
+.tete h1{font-size:clamp(38px,5.5vw,66px);margin:6px 0 12px}
+.tete h2{font-size:clamp(30px,4vw,46px);margin:6px 0 10px}
+.chapo{margin:0;color:#3d4a4d;max-width:70ch}
+
+/* ---------- Composants partagés (utilisés aussi par les parties 3 et 4) ---------- */
+.panneau{background:var(--voile);border:1px solid var(--ligne);border-radius:var(--rayon);padding:18px}
+.panneau h3{font-size:19px;margin:0 0 10px}
+.pilules{display:flex;flex-wrap:wrap;gap:8px}
+.pilule{border:1px solid var(--ligne);background:#fff;border-radius:999px;padding:6px 14px;cursor:pointer;
+        font-size:14px;display:inline-flex;align-items:center;gap:8px}
+.pilule[aria-pressed="true"],.pilule.actif{background:var(--canard);border-color:var(--canard);color:#fff}
+.pastille{width:10px;height:10px;border-radius:50%;background:var(--c,#999);flex:none;display:inline-block}
+.bouton{border:0;background:var(--canard);color:#fff;border-radius:999px;padding:9px 18px;cursor:pointer;font-weight:600}
+.bouton.leger{background:transparent;color:var(--canard);border:1.5px solid var(--canard)}
+.etat{font-size:14px;color:var(--gris);margin:10px 0 0}
+.etat.erreur{color:#a33b2b}
+.app-vide{display:grid;place-items:center;min-height:240px;border:2px dashed var(--ligne);border-radius:var(--rayon);
+          color:var(--gris);text-align:center;padding:20px}
+.map{width:100%;min-height:420px;border-radius:var(--rayon);overflow:hidden;background:#e9e6df}
+#tip{position:fixed;z-index:90;pointer-events:none;max-width:300px;background:#fff;border:1px solid var(--ligne);
+     border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.4;box-shadow:0 8px 24px rgba(0,0,0,.12)}
+#tip b{font-family:"Barlow Condensed";font-size:17px;color:var(--canard)}
+
+/* ---------- Accueil ---------- */
+.accueil-grille{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(260px,1fr);gap:24px}
+#accueil-carte{height:min(70vh,560px)}
+.chiffres{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:6px 0 16px}
+.chiffre b{display:block;font:700 38px "Barlow Condensed";color:var(--canard);line-height:1}
+.chiffre span{font-size:13px;color:var(--gris)}
+.liste-pnr{list-style:none;padding:0;margin:0;display:grid;gap:2px}
+.liste-pnr button{width:100%;text-align:left;display:flex;gap:10px;align-items:center;border:0;background:transparent;
+                  padding:7px 8px;border-radius:10px;cursor:pointer}
+.liste-pnr button:hover,.liste-pnr button.actif{background:rgba(46,124,134,.1)}
+.liste-pnr small{margin-left:auto;color:var(--gris)}
+
+/* ---------- Sommaire en cercles ---------- */
+#sommaire-viz svg{width:100%;height:auto;display:block}
+.cercle{cursor:pointer;outline:none}
+.cercle text{pointer-events:none}
+.cercle .titre{font:700 30px "Barlow Condensed";fill:var(--encre);paint-order:stroke;stroke:rgba(247,245,240,.85);stroke-width:5px}
+.cercle .sous{font:500 15px Barlow;fill:#3d4a4d;paint-order:stroke;stroke:rgba(247,245,240,.85);stroke-width:4px}
+.cercle .num{font:700 14px "Barlow Condensed";letter-spacing:.16em;fill:var(--canard)}
+.cercle:focus-visible .disque{stroke:var(--canard);stroke-width:3}
+
+/* ---------- Constats ---------- */
+.grille-constats{display:grid;gap:24px;grid-template-columns:repeat(auto-fit,minmax(270px,1fr))}
+.constat{position:relative;isolation:isolate;overflow:hidden;background:var(--voile);border:1px solid var(--ligne);
+         border-radius:var(--rayon);padding:28px 24px 20px}
+.constat::before{content:"";position:absolute;z-index:-1;width:190px;height:190px;border-radius:50%;background:var(--c);
+                 opacity:.45;mix-blend-mode:multiply;top:-70px;right:-60px}
+.constat .num{font:700 14px "Barlow Condensed";letter-spacing:.14em;text-transform:uppercase;color:var(--canard)}
+.constat h3{font-size:clamp(24px,2.4vw,30px);margin:6px 0 14px}
+.constat details{border-top:1px solid var(--ligne);margin-top:16px;padding-top:10px}
+.constat summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px;font:600 15px "Barlow Condensed";
+                 letter-spacing:.1em;text-transform:uppercase;color:var(--canard)}
+.constat summary::-webkit-details-marker{display:none}
+.constat summary::before{content:"+";display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;
+                         border:1.5px solid currentColor;transition:transform .25s}
+.constat details[open] summary::before{transform:rotate(45deg)}
+.constat li{margin:5px 0}
+.constat li::marker{color:var(--canard)}
+
+/* ---------- Galerie + loupe ---------- */
+.galerie{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.galerie figure{margin:0}
+.galerie button{display:block;width:100%;padding:0;border:1px solid var(--ligne);border-radius:var(--rayon);
+                overflow:hidden;background:#fff;cursor:zoom-in}
+.galerie img{display:block;width:100%;height:280px;object-fit:contain;background:#fff}
+.galerie figcaption{font-size:14px;color:var(--gris);margin-top:8px}
+.galerie .absente img{opacity:.15}
+#loupe{position:fixed;inset:0;z-index:95;background:rgba(20,28,30,.86);display:grid;place-items:center;padding:24px;cursor:zoom-out}
+#loupe[hidden]{display:none}
+#loupe img{max-width:100%;max-height:88vh;border-radius:10px;background:#fff}
+
+/* ---------- Sources + pied ---------- */
+.sources{columns:2 320px;gap:32px;padding-left:20px;margin:0}
+.sources li{margin:6px 0;break-inside:avoid}
+footer{padding:28px clamp(18px,4vw,56px);font-size:13px;color:var(--gris);margin-left:var(--nav)}
+
+/* ---------- Mobile ---------- */
+@media (max-width:900px){
+  #nav{transform:translateX(-100%);transition:transform .25s;box-shadow:0 0 40px rgba(0,0,0,.15)}
+  body.nav-ouverte #nav{transform:none}
+  #burger{display:block}
+  main,footer{margin-left:0}
+  .accueil-grille{grid-template-columns:1fr}
+  .section{padding-top:72px}
+}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+
+<div id="progression"></div>
+<button id="burger" type="button" aria-label="Ouvrir le sommaire" aria-expanded="false">☰</button>
+
+<nav id="nav" aria-label="Sommaire de la page">
+  <div class="marque">Singularités des territoires <b>PNR 2024</b></div>
+  <input id="nav-filtre" type="search" placeholder="Filtrer les chapitres…" aria-label="Filtrer les chapitres">
+  <ol id="nav-liste"></ol>
+  <div class="nav-pied">ENSA Nantes · Singularités des territoires</div>
+</nav>
+
+<main>
+  <section id="accueil" class="section" data-titre="Accueil">
+    <div class="tete" style="--c:#9cdeec">
+      <span class="kicker">01 · Parcs naturels régionaux · 2024</span>
+      <h1>Le PNR de Brière au prisme des valeurs</h1>
+      <p class="chapo">Comment observer un territoire à travers les valeurs qu'on lui attribue ? Survolez la carte ou la liste pour découvrir les parcs, cliquez pour zoomer.</p>
+    </div>
+    <div class="accueil-grille">
+      <div id="accueil-carte" class="map"></div>
+      <aside class="panneau">
+        <h3>Les parcs de la région</h3>
+        <div class="chiffres" id="accueil-chiffres"></div>
+        <ul class="liste-pnr" id="accueil-liste"></ul>
+        <p class="etat" id="accueil-etat">Chargement de la carte…</p>
+      </aside>
+    </div>
+  </section>
+
+  <section id="sommaire" class="section" data-titre="Sommaire">
+    <div class="tete" style="--c:#f6d58e">
+      <span class="kicker">02 · Sommaire</span>
+      <h2>Quatre entrées dans le projet</h2>
+      <p class="chapo">Chaque cercle mène à un chapitre. Survolez-le pour le révéler, cliquez pour y aller.</p>
+    </div>
+    <div id="sommaire-viz"></div>
+  </section>
+
+  <section id="constats" class="section" data-titre="Constats">
+    <div class="tete" style="--c:#f4b6c8">
+      <span class="kicker">03 · Constats</span>
+      <h2>Ce que révèlent les diagnostics</h2>
+      <p class="chapo">Trois constats issus de l'analyse des diagnostics et des observatoires des PNR. Dépliez chaque carte pour lire ses conséquences.</p>
+    </div>
+    <div id="constats-grille" class="grille-constats"></div>
+  </section>
+
+  <section id="rieglelisation" class="section" data-titre="Rieglelisation">
+    <div class="tete" style="--c:#b8e0c8">
+      <span class="kicker">04 · Rieglelisation</span>
+      <h2>Lire le territoire par les valeurs</h2>
+      <p class="chapo">D'après Aloïs Riegl, un patrimoine porte des valeurs de remémoration et de contemporanéité. Cliquez sur une image pour l'agrandir.</p>
+    </div>
+    <div id="galerie" class="galerie"></div>
+  </section>
+
+  <section id="modele" class="section" data-titre="Modèle des PNR">
+    <div class="tete" style="--c:#f4b6c8">
+      <span class="kicker">05 · Proposition de modèle</span>
+      <h2>Valeurs, caractères, indicateurs, attributs</h2>
+      <p class="chapo">Le modèle décline les six valeurs en quatre niveaux. Cliquez sur un secteur pour l'explorer, puis affichez ses données sur la carte.</p>
+    </div>
+    <div id="modele-app" class="app-vide">Le modèle interactif apparaîtra ici une fois la <b>partie 3</b> collée.</div>
+  </section>
+
+  <section id="cartes" class="section" data-titre="Dynamiques des valeurs">
+    <div class="tete" style="--c:#9cdeec">
+      <span class="kicker">06 · Dynamiques des valeurs</span>
+      <h2>Cartographier les valeurs du territoire</h2>
+      <p class="chapo">Choisissez une carte, filtrez par valeur, par niveau du modèle et par période. Les graphiques se recalculent à partir des données filtrées.</p>
+    </div>
+    <div id="carte-app" class="app-vide">La carte interactive apparaîtra ici une fois la <b>partie 4</b> collée.</div>
+  </section>
+
+  <section id="sources" class="section" data-titre="Sources">
+    <div class="tete" style="--c:#f6d58e">
+      <span class="kicker">07 · Sources</span>
+      <h2>Sources et crédits</h2>
+    </div>
+    <ul class="sources">
+      <li>Périmètres des PNR : INPN (MNHN) via la base territoriale SIGLOIRE.</li>
+      <li>Données cartographiques : fichiers GeoJSON du projet (cartes Valeurs, Ancienneté, Objectifs 1.2 et 1.3).</li>
+      <li>Modèle : <code>riegl.json</code>, équipe 2024, d'après A. Riegl, <i>Le Culte moderne des monuments</i> (1903).</li>
+      <li>Fond de carte : © OpenStreetMap contributors, © CARTO.</li>
+      <li><b>[À compléter]</b> liste complète des sources des anciennes cartes.</li>
+    </ul>
+  </section>
+</main>
+
+<footer>Page refaite par le groupe Interfaces / data visualisations — version de travail, à valider avec les coordinateurs.</footer>
+
+<div id="tip" hidden></div>
+<div id="loupe" hidden><img alt=""></div>
+<!-- ===== FIN DE LA PARTIE 1/4 ===== -->
+<!-- ===== PARTIE 2/4 : SOCLE COMMUN + ACCUEIL + SOMMAIRE + CONSTATS + IMAGES ===== -->
+<script>
+/* ============================================================
+   RÉGLAGES — modifiables sans toucher au reste du code
+   ============================================================ */
+const SOMMAIRE = [  // titres provisoires : à remplacer par ceux de l'introdotte
+  { titre: "Constats",               sous: "Ce que révèlent les diagnostics", section: "constats",       couleur: "#9cdeec" },
+  { titre: "Rieglelisation",         sous: "Lire le territoire par les valeurs", section: "rieglelisation", couleur: "#f6d58e" },
+  { titre: "Modèle des PNR",         sous: "Valeurs, caractères, indicateurs", section: "modele",         couleur: "#f4b6c8" },
+  { titre: "Dynamiques des valeurs", sous: "Cartes et indicateurs",           section: "cartes",         couleur: "#b8e0c8" }
+];
+
+const CONSTATS = [
+  { titre: "Discontinuité des diagnostics territoriaux", couleur: "#9cdeec",
+    resume: "Suite à l’analyse des diagnostics initiaux pour l’obtention du label « PNR » et des méthodes d’observation utilisées au sein même des PNR, nous avons constaté qu’il n’existe pas de méthode d’observation territoriale uniformisée.",
+    consequences: ["Des études produites à la chaîne", "Des conclusions inspirées des idéologies contemporaines",
+                   "Pas de méthode d’observation généralisée au sein des PNR", "Manque de temps pour appréhender le territoire dans sa globalité"] },
+  { titre: "Des observatoires, mais pour observer quoi ?", couleur: "#f4b6c8",
+    resume: "Des observatoires sont mis en place dans certains PNR. Si ce n’est pas le cas, ce sont les agents des PNR qui se chargent de l’étude du territoire. Les politiques d’observation du territoire dépendent beaucoup de la direction, et peuvent varier en fonction des années. Aucune méthode n’est généralisée pour l’application des objectifs de la charte.",
+    consequences: ["Décorrélation entre diagnostics initiaux et observatoires", "Des sujets d’observation qui dépendent de la direction des PNR",
+                   "Une prise de recul difficile", "L’analyse patrimoniale pose question"] },
+  { titre: "Une organisation de la donnée en silo", couleur: "#f6d58e",
+    resume: "La donnée collectée par les PNR dépend ainsi des sujets étudiés. Même si les données publiques sont accessibles, elles ont elles aussi leurs lacunes. Les structures sortent rarement de leur silo pour mener une politique de création et de partage de données.",
+    consequences: ["Manque de classification", "Des lacunes sur les données publiques",
+                   "Des acteurs et structures qui ne partagent pas systématiquement leurs données", "Faible mise en confrontation des données"] }
+];
+
+const IMAGES = [
+  { src: "img/riegl PNR.PNG",   legende: "Rieglelisation du PNR de Brière" },
+  { src: "img/PNR_usage.PNG",   legende: "Lecture par la valeur d’usage" }
+];
+
+const ACCUEIL = {
+  fichier: "maps/Objectif 1.2/data/pnr.json",  // périmètres des PNR (déjà sur le site)
+  imageSecours: "img/carte HIBA.png"           // ancienne image, affichée si la carte ne charge pas
+};
+
+/* ============================================================
+   APP — boîte à outils partagée par toutes les parties
+   ============================================================ */
+const APP = {
+  BASE: "https://singularitesdesterritoires.nantes.archi.fr/html/PNR/",
+  FOND: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json", // fond gratuit, sans clé
+  VALEURS: ["Nouveauté", "Usage", "Art", "Histoire", "Ancienneté", "Mémoire"],
+  FAMILLES: { "Contemporanéité": ["Nouveauté", "Usage", "Art"], "Remémoration": ["Histoire", "Ancienneté", "Mémoire"] },
+  COULEURS: { "Nouveauté": "#3f9fae", "Usage": "#6cbf9b", "Art": "#e9a93a",
+              "Histoire": "#8c7bd1", "Ancienneté": "#e07a5f", "Mémoire": "#de5ba1" },
+  NIVEAUX: ["Valeur", "Caractère", "Indicateur", "Attribut"],
+  LOCALE_CARTE: {
+    "CooperativeGesturesHandler.WindowsHelpText": "Ctrl + molette pour zoomer la carte",
+    "CooperativeGesturesHandler.MacHelpText": "⌘ + molette pour zoomer la carte",
+    "CooperativeGesturesHandler.MobileHelpText": "Utilisez deux doigts pour déplacer la carte",
+    "NavigationControl.ZoomIn": "Zoomer", "NavigationControl.ZoomOut": "Dézoomer"
+  },
+
+  // Petit système de messages entre les parties (ex. : le modèle demande à la carte de filtrer)
+  _ecouteurs: {},
+  on(nom, f) { (this._ecouteurs[nom] = this._ecouteurs[nom] || []).push(f); },
+  emit(nom, d) { (this._ecouteurs[nom] || []).forEach(f => f(d)); },
+
+  couleur(v) { return this.COULEURS[v] || "#9aa5a8"; },
+  norm(s) { return String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim(); },
+  echap(t) { return String(t ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); },
+
+  // Chemin relatif → adresse complète (gère les espaces : "Objectif 1.2" → "Objectif%201.2")
+  url(chemin) { return /^https?:/.test(chemin) ? chemin : this.BASE + chemin.split("/").map(encodeURIComponent).join("/"); },
+  async json(chemin) {
+    const r = await fetch(this.url(chemin));
+    if (!r.ok) throw new Error("fichier introuvable (" + r.status + ")");
+    return r.json();
+  },
+  messageErreur(e) {
+    return location.hostname.includes("singularitesdesterritoires")
+      ? "Erreur de chargement : " + e.message
+      : "Les données du site ne sont pas accessibles depuis cette adresse (normal sur CodePen ou en local). Elles se chargeront une fois la page en ligne.";
+  },
+
+  // Lance f() seulement quand l'élément approche de l'écran (économise la mémoire)
+  quandVisible(el, f) {
+    if (!el) return;
+    const io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { io.disconnect(); f(); } }, { rootMargin: "300px" });
+    io.observe(el);
+  },
+
+  // Rectangle englobant d'une géométrie GeoJSON : [ouest, sud, est, nord]
+  bbox(geom) {
+    const b = [180, 90, -180, -90];
+    (function parcourir(c) {
+      if (typeof c[0] === "number") { b[0] = Math.min(b[0], c[0]); b[1] = Math.min(b[1], c[1]); b[2] = Math.max(b[2], c[0]); b[3] = Math.max(b[3], c[1]); }
+      else c.forEach(parcourir);
+    })(geom.coordinates);
+    return b;
+  },
+
+  aller(id) {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+    document.body.classList.remove("nav-ouverte");
+    const b = document.getElementById("burger");
+    b.textContent = "☰"; b.setAttribute("aria-expanded", "false");
+  }
+};
+
+// Info-bulle partagée
+APP.tip = (() => {
+  const el = document.getElementById("tip");
+  return {
+    montrer(html, ev) { el.innerHTML = html; el.hidden = false; this.bouger(ev); },
+    bouger(ev) {
+      if (el.hidden || !ev) return;
+      const r = el.getBoundingClientRect();
+      el.style.left = Math.min(ev.clientX + 14, innerWidth - r.width - 8) + "px";
+      el.style.top = Math.min(ev.clientY + 14, innerHeight - r.height - 8) + "px";
+    },
+    cacher() { el.hidden = true; }
+  };
+})();
+
+/* ============================================================
+   NAVIGATION : sommaire latéral, filtre, section active, progression, burger
+   ============================================================ */
+(function navigation() {
+  const sections = [...document.querySelectorAll("main > section[data-titre]")];
+  const liste = document.getElementById("nav-liste");
+  liste.innerHTML = sections.map((s, i) =>
+    `<li><a href="#${s.id}" data-id="${s.id}"><span>${String(i + 1).padStart(2, "0")}</span>${s.dataset.titre}</a></li>`).join("");
+  const liens = [...liste.querySelectorAll("a")];
+
+  liste.addEventListener("click", e => {
+    const a = e.target.closest("a"); if (!a) return;
+    e.preventDefault(); APP.aller(a.dataset.id);
+  });
+
+  document.getElementById("nav-filtre").addEventListener("input", e => {
+    const q = APP.norm(e.target.value);
+    liens.forEach(a => a.parentElement.hidden = q && !APP.norm(a.textContent).includes(q));
+  });
+
+  const io = new IntersectionObserver(es => es.forEach(en => {
+    if (en.isIntersecting) liens.forEach(a => a.classList.toggle("actif", a.dataset.id === en.target.id));
+  }), { rootMargin: "-45% 0px -50% 0px" });
+  sections.forEach(s => io.observe(s));
+
+  const barre = document.getElementById("progression");
+  const maj = () => { const h = document.documentElement; barre.style.width = (100 * h.scrollTop / Math.max(1, h.scrollHeight - h.clientHeight)) + "%"; };
+  addEventListener("scroll", maj, { passive: true }); maj();
+
+  const burger = document.getElementById("burger");
+  burger.addEventListener("click", () => {
+    const ouvert = document.body.classList.toggle("nav-ouverte");
+    burger.setAttribute("aria-expanded", ouvert); burger.textContent = ouvert ? "✕" : "☰";
+  });
+  addEventListener("keydown", e => {
+    if (e.key === "Escape" && document.body.classList.contains("nav-ouverte")) {
+      document.body.classList.remove("nav-ouverte"); burger.textContent = "☰"; burger.setAttribute("aria-expanded", "false");
+    }
+  });
+})();
+
+/* ============================================================
+   01 · ACCUEIL : carte des PNR (survol, liste, zoom)
+   ============================================================ */
+(function accueil() {
+  const box = document.getElementById("accueil-carte");
+  const etat = document.getElementById("accueil-etat");
+  const liste = document.getElementById("accueil-liste");
+  const chiffres = document.getElementById("accueil-chiffres");
+  const joliNom = s => String(s || "").toLowerCase().replace(/(^|[\s'-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
+  const dateFr = s => s ? new Date(s).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : "date inconnue";
+
+  APP.quandVisible(box, async () => {
+    let pnr;
+    try { pnr = await APP.json(ACCUEIL.fichier); }
+    catch (e) {
+      box.innerHTML = `<img src="${APP.url(ACCUEIL.imageSecours)}" alt="Carte des parcs naturels régionaux" style="width:100%;height:100%;object-fit:contain;background:#fff">`;
+      etat.textContent = APP.messageErreur(e); etat.classList.add("erreur");
+      return;
+    }
+
+    const feats = pnr.features.filter(f => f.geometry);
+    feats.forEach((f, i) => { f.id = i + 1; f.properties.briere = /bri[eè]re/i.test(f.properties.nom_site || "") ? 1 : 0; });
+    const parId = id => feats.find(f => f.id === id);
+    const briere = feats.find(f => f.properties.briere);
+    const tri = [...feats].sort((a, b) => String(a.properties.date_crea).localeCompare(String(b.properties.date_crea)));
+
+    chiffres.innerHTML = `<div class="chiffre"><b>${feats.length}</b><span>parcs dans les données</span></div>`
+      + (briere ? `<div class="chiffre"><b>${String(briere.properties.date_crea).slice(0, 4)}</b><span>création de la Brière</span></div>` : "");
+    liste.innerHTML = tri.map(f => `<li><button type="button" data-id="${f.id}">
+        <span class="pastille" style="--c:${f.properties.briere ? "#2e7c86" : "#9cdeec"}"></span>${joliNom(f.properties.nom_site)}
+        <small>${String(f.properties.date_crea || "").slice(0, 4)}</small></button></li>`).join("");
+    etat.innerHTML = "Source : INPN / SIGLOIRE. " + (briere?.properties.url_fiche
+      ? `<a href="${briere.properties.url_fiche}" target="_blank" rel="noopener">Fiche INPN de la Brière ↗</a>` : "");
+
+    const tout = feats.map(f => APP.bbox(f.geometry)).reduce((a, b) =>
+      [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[2], b[2]), Math.max(a[3], b[3])]);
+
+    const map = new maplibregl.Map({
+      container: box, style: APP.FOND,
+      bounds: [[tout[0], tout[1]], [tout[2], tout[3]]], fitBoundsOptions: { padding: 30 },
+      cooperativeGestures: true, attributionControl: { compact: true }, locale: APP.LOCALE_CARTE
+    });
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+
+    const zoomSur = id => {
+      const b = id == null ? tout : APP.bbox(parId(id).geometry);
+      map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: 40, duration: 800 });
+    };
+    let survol = null;
+    const marquer = id => {
+      if (!map.getSource("pnr")) return;
+      if (survol !== null) map.setFeatureState({ source: "pnr", id: survol }, { survol: false });
+      survol = id;
+      if (id !== null) map.setFeatureState({ source: "pnr", id }, { survol: true });
+      liste.querySelectorAll("button").forEach(b => b.classList.toggle("actif", +b.dataset.id === id));
+    };
+    const fiche = p => `<b>${joliNom(p.nom_site)}</b><br>Créé le ${dateFr(p.date_crea)}<br><small>${APP.echap(p.gest_site || "")}</small>`;
+
+    map.on("load", () => {
+      map.addSource("pnr", { type: "geojson", data: { type: "FeatureCollection", features: feats } });
+      map.addLayer({ id: "pnr-fond", type: "fill", source: "pnr", paint: {
+        "fill-color": ["case", ["==", ["get", "briere"], 1], "#2e7c86", "#9cdeec"],
+        "fill-opacity": ["case", ["boolean", ["feature-state", "survol"], false], 0.7, ["==", ["get", "briere"], 1], 0.5, 0.3]
+      } });
+      map.addLayer({ id: "pnr-contour", type: "line", source: "pnr", paint: {
+        "line-color": "#2e7c86", "line-width": ["case", ["==", ["get", "briere"], 1], 2.5, 1]
+      } });
+    });
+    map.on("mousemove", "pnr-fond", e => {
+      const f = e.features[0];
+      if (f.id !== survol) marquer(f.id);
+      map.getCanvas().style.cursor = "pointer";
+      APP.tip.montrer(fiche(f.properties), e.originalEvent);
+    });
+    map.on("mouseleave", "pnr-fond", () => { marquer(null); map.getCanvas().style.cursor = ""; APP.tip.cacher(); });
+    map.on("click", "pnr-fond", e => zoomSur(e.features[0].id));
+
+    liste.addEventListener("mouseover", e => { const b = e.target.closest("button"); if (b) marquer(+b.dataset.id); });
+    liste.addEventListener("mouseleave", () => marquer(null));
+    liste.addEventListener("click", e => { const b = e.target.closest("button"); if (b) zoomSur(+b.dataset.id); });
+  });
+})();
+
+/* ============================================================
+   02 · SOMMAIRE : cercles de particules cliquables
+   ============================================================ */
+(function sommaire() {
+  const box = document.getElementById("sommaire-viz");
+  const reduit = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let timer = null, visible = false, etroitAvant = null;
+
+  // Coupe un titre long en 2 lignes, au niveau de l'espace le plus central
+  const couper = t => {
+    if (t.length <= 13) return [t];
+    let meilleur = -1;
+    [...t].forEach((c, i) => { if (c === " " && (meilleur < 0 || Math.abs(i - t.length / 2) < Math.abs(meilleur - t.length / 2))) meilleur = i; });
+    return meilleur < 0 ? [t] : [t.slice(0, meilleur), t.slice(meilleur + 1)];
+  };
+
+  function dessiner() {
+    const etroit = box.clientWidth < 640;
+    if (etroit === etroitAvant) return;
+    etroitAvant = etroit;
+    const W = etroit ? 600 : 1000, H = etroit ? 620 : 400, R = etroit ? 135 : 125;
+    const pos = etroit ? [[170, 170], [430, 170], [170, 450], [430, 450]] : [[170, 200], [390, 200], [610, 200], [830, 200]];
+
+    timer?.stop();
+    box.innerHTML = "";
+    const svg = d3.select(box).append("svg").attr("viewBox", `0 0 ${W} ${H}`);
+    const donnees = SOMMAIRE.map((d, i) => ({
+      ...d, i, x: pos[i][0], y: pos[i][1], dil: 1, dilCible: 1,
+      pts: d3.range(170).map(() => ({ a: Math.random() * 2 * Math.PI, r: R * Math.sqrt(Math.random()) * 0.96,
+                                      v: (Math.random() - 0.5) * 0.004, t: 1 + Math.random() * 1.6 }))
+    }));
+
+    const g = svg.selectAll("g.cercle").data(donnees).join("g")
+      .attr("class", "cercle").attr("transform", d => `translate(${d.x},${d.y})`)
+      .attr("tabindex", 0).attr("role", "link").attr("aria-label", d => d.titre + " : aller au chapitre");
+
+    g.append("circle").attr("class", "disque").attr("r", R)
+      .attr("fill", d => d.couleur).attr("fill-opacity", 0.35).style("mix-blend-mode", "multiply");
+
+    g.each(function (d) {
+      const sel = d3.select(this);
+      sel.append("g").attr("class", "pts").selectAll("circle").data(d.pts).join("circle")
+        .attr("r", p => p.t).attr("fill", d3.color(d.couleur).darker(1.3)).attr("fill-opacity", 0.7);
+      const lignes = couper(d.titre);
+      const t = sel.append("text").attr("class", "titre").attr("text-anchor", "middle");
+      lignes.forEach((l, k) => t.append("tspan").attr("x", 0).attr("y", (k - (lignes.length - 1) / 2) * 30 + 4).text(l));
+      sel.append("text").attr("class", "num").attr("text-anchor", "middle").attr("y", -lignes.length * 15 - 22)
+        .text(String(d.i + 1).padStart(2, "0"));
+      sel.append("text").attr("class", "sous").attr("text-anchor", "middle").attr("y", lignes.length * 15 + 26).text(d.sous);
+    });
+
+    const survoler = (el, d, oui) => {
+      d.dilCible = oui ? 1.12 : 1;
+      d3.select(el).select(".disque").transition().duration(200).attr("fill-opacity", oui ? 0.6 : 0.35);
+    };
+    g.on("mouseenter focus", function (e, d) { survoler(this, d, true); })
+     .on("mouseleave blur", function (e, d) { survoler(this, d, false); })
+     .on("click", (e, d) => APP.aller(d.section))
+     .on("keydown", (e, d) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); APP.aller(d.section); } });
+
+    const points = g.selectAll(".pts circle");
+    const disques = g.select(".disque");
+    function tic() {
+      if (!visible) return;
+      donnees.forEach(d => {
+        d.dil += (d.dilCible - d.dil) * 0.12;
+        d.pts.forEach(p => { p.a += p.v; p.dil = d.dil; });
+      });
+      points.attr("cx", p => Math.cos(p.a) * p.r * p.dil).attr("cy", p => Math.sin(p.a) * p.r * p.dil);
+      disques.attr("r", d => R * d.dil);
+    }
+    visible = true; tic(); visible = false;
+    if (!reduit) timer = d3.timer(tic);
+    else g.on("mouseenter.r mouseleave.r", () => { visible = true; d3.timeout(() => tic(), 0); });
+  }
+
+  // Animation seulement quand le sommaire est à l'écran
+  new IntersectionObserver(es => { visible = es.some(e => e.isIntersecting); }).observe(box);
+  let attente;
+  new ResizeObserver(() => { clearTimeout(attente); attente = setTimeout(dessiner, 150); }).observe(box);
+  dessiner();
+})();
+
+/* ============================================================
+   03 · CONSTATS : cartes dépliables (balise <details>, pas de script)
+   ============================================================ */
+(function constats() {
+  document.getElementById("constats-grille").innerHTML = CONSTATS.map((c, i) => `
+    <article class="constat" style="--c:${c.couleur}">
+      <div class="num">Constat ${String(i + 1).padStart(2, "0")}</div>
+      <h3>${c.titre}</h3>
+      <p>${c.resume}</p>
+      <details>
+        <summary>Conséquences</summary>
+        <ul>${c.consequences.map(x => `<li>${x}</li>`).join("")}</ul>
+      </details>
+    </article>`).join("");
+})();
+
+/* ============================================================
+   04 · RIEGLELISATION : galerie + loupe (Échap ou clic pour fermer)
+   ============================================================ */
+(function galerie() {
+  const g = document.getElementById("galerie");
+  const loupe = document.getElementById("loupe");
+  const img = loupe.querySelector("img");
+  g.innerHTML = IMAGES.map((im, i) => `
+    <figure>
+      <button type="button" data-i="${i}" aria-label="Agrandir : ${APP.echap(im.legende)}">
+        <img src="${APP.url(im.src)}" alt="${APP.echap(im.legende)}" loading="lazy"
+             onerror="this.closest('figure').classList.add('absente')">
+      </button>
+      <figcaption>${im.legende}</figcaption>
+    </figure>`).join("");
+  g.addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    const im = IMAGES[b.dataset.i];
+    img.src = APP.url(im.src); img.alt = im.legende; loupe.hidden = false;
+  });
+  loupe.addEventListener("click", () => loupe.hidden = true);
+  addEventListener("keydown", e => { if (e.key === "Escape") loupe.hidden = true; });
+})();
+
+console.log("✅ Partie 2/4 chargée");
+</script>
+<!-- ===== FIN DE LA PARTIE 2/4 ===== -->
+<!-- ===== PARTIE 3/4 : MODÈLE RIEGL INTERACTIF (anneaux zoomables) ===== -->
+<style>
+#modele-app.modele{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(280px,1fr);gap:28px;align-items:start}
+@media (max-width:900px){#modele-app.modele{grid-template-columns:1fr}}
+.modele-recherche{position:relative;margin-bottom:12px}
+.modele-recherche input{width:100%;box-sizing:border-box;padding:10px 16px;border:1px solid var(--ligne);border-radius:999px;font:inherit;background:#fff}
+.modele-recherche input:focus{outline:2px solid var(--canard);outline-offset:1px}
+.modele-recherche ul{position:absolute;z-index:20;left:0;right:0;top:calc(100% + 4px);margin:0;padding:6px;list-style:none;background:#fff;border:1px solid var(--ligne);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.12);max-height:320px;overflow:auto}
+.modele-recherche li button{display:flex;flex-wrap:wrap;align-items:center;gap:6px;width:100%;text-align:left;border:0;background:none;padding:7px 8px;border-radius:8px;cursor:pointer;font:inherit;color:inherit}
+.modele-recherche li button:hover,.modele-recherche li button:focus-visible{background:var(--papier)}
+.modele-recherche li small{width:100%;color:var(--gris);padding-left:18px}
+.modele-recherche .vide{padding:8px;color:var(--gris)}
+.modele-viz svg{width:100%;height:auto;display:block;max-height:80vh}
+.modele-viz path{stroke:#fff;stroke-width:.6;cursor:pointer}
+.modele-viz path:hover{filter:brightness(.92)}
+.modele-viz path.chemin{stroke:var(--encre);stroke-width:1}
+.modele-viz path.choisi{stroke:var(--encre);stroke-width:2.5}
+.modele-labels text{font:500 10.5px "Barlow Condensed",sans-serif;fill:var(--encre)}
+.modele-centre{outline:none}
+.modele-centre circle{fill:#fff;stroke:var(--ligne)}
+.modele-centre:focus-visible circle{stroke:var(--canard);stroke-width:3}
+.modele-centre .t{font:600 15px "Barlow Condensed",sans-serif;fill:var(--encre)}
+.modele-centre .s{font:12px Barlow,sans-serif;fill:var(--gris)}
+.modele-legende{display:flex;flex-wrap:wrap;gap:16px 28px;margin-top:10px}
+.modele-famille{display:block;font:600 12px Barlow,sans-serif;text-transform:uppercase;letter-spacing:.08em;color:var(--gris);margin-bottom:6px}
+.modele-panneau{position:sticky;top:20px;max-height:calc(100vh - 40px);overflow:auto}
+.modele-ariane{font-size:13px;color:var(--gris);margin-bottom:10px;line-height:1.6}
+.modele-ariane button{border:0;background:none;padding:0;color:var(--canard);cursor:pointer;font:inherit;text-decoration:underline}
+.modele-niveau{display:inline-flex;align-items:center;gap:6px;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--gris)}
+.modele-panneau h3{margin:6px 0 8px;font-family:"Barlow Condensed",sans-serif;font-size:28px;line-height:1.1}
+.modele-panneau h4{margin:16px 0 6px;font:600 12px Barlow,sans-serif;text-transform:uppercase;letter-spacing:.08em;color:var(--gris)}
+.modele-def{line-height:1.55}
+.modele-def.vide{color:var(--gris);font-style:italic}
+.modele-enfants{list-style:none;margin:6px 0 14px;padding:0;display:grid;gap:4px}
+.modele-enfants button{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:1px solid var(--ligne);background:#fff;border-radius:10px;padding:7px 10px;cursor:pointer;font:inherit;color:inherit}
+.modele-enfants button:hover,.modele-enfants button:focus-visible{border-color:var(--canard)}
+.modele-enfants small{margin-left:auto;color:var(--gris)}
+.modele-donnees{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:14px;margin:8px 0 14px}
+.modele-donnees dt{color:var(--gris)}
+.modele-donnees dd{margin:0;word-break:break-word}
+.modele-chiffres{display:flex;gap:18px;flex-wrap:wrap;margin:12px 0}
+.modele-chiffres div{display:flex;flex-direction:column}
+.modele-chiffres b{font:600 26px "Barlow Condensed",sans-serif;color:var(--canard)}
+.modele-chiffres span{font-size:12px;color:var(--gris)}
+.modele-note{font-size:12px;color:var(--gris);margin-top:6px}
+</style>
+
+<script>
+/* ============================================================
+   RÉGLAGES DU MODÈLE
+   ============================================================ */
+const MODELE = {
+  fichier: "maps/pnr_2024/Riegl/riegl.json",
+  titre: "Valeurs",   // texte au centre des anneaux
+  champs: { format: "Format", url: "Lien", "temporalité": "Temporalité", acteurs: "Acteurs",
+            source: "Source", api: "API", normes: "Normes", nomemclature: "Nomenclature" },
+  corrections: [[/Rarreté/g, "Rareté"]]   // fautes corrigées à l'affichage
+};
+
+/* ============================================================
+   05 · MODÈLE : anneaux zoomables + panneau + recherche
+   ============================================================ */
+(function modele() {
+  const box = document.getElementById("modele-app");
+  if (!box) return;
+  const reduit = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  box.classList.remove("app-vide"); box.classList.add("modele");
+  box.innerHTML = `<p class="etat">Chargement du modèle…</p>`;
+
+  /* ---- 1. Lecture et nettoyage de riegl.json (accepte plusieurs formes de fichier) ---- */
+  const corriger = s => MODELE.corrections.reduce((t, [a, b]) => t.replace(a, b), String(s ?? "").trim());
+  const enfantsDe = n => {
+    for (const k of ["children", "enfants", "sous", "items", "nodes"]) if (Array.isArray(n[k])) return n[k];
+    for (const [k, v] of Object.entries(n))
+      if (k !== "data" && Array.isArray(v) && v.length && v[0] && typeof v[0] === "object" && ("label" in v[0] || "name" in v[0])) return v;
+    return [];
+  };
+  const nettoyer = n => ({
+    label: corriger(n.label ?? n.name ?? n.nom ?? n.titre ?? "Sans titre"),
+    definition: corriger(n["définition"] ?? n.definition ?? n.description ?? ""),
+    color: n.color ?? n.couleur,
+    data: Array.isArray(n.data) ? n.data : [],
+    children: enfantsDe(n).map(nettoyer)
+  });
+  function preparer(brut) {
+    let r = brut;
+    if (Array.isArray(r)) r = { label: MODELE.titre, children: r };
+    else if (r && typeof r === "object" && !enfantsDe(r).length)
+      r = { label: MODELE.titre, children: Object.entries(r).filter(([, v]) => v && typeof v === "object")
+            .flatMap(([k, v]) => Array.isArray(v) ? v : [{ label: k, ...v }]) };
+    let arbre = nettoyer(r);
+    while (arbre.children.length === 1 && arbre.children[0].children.length > 1) arbre = arbre.children[0];
+    if (!arbre.label || arbre.label === "Sans titre") arbre.label = MODELE.titre;
+    const rang = l => { const i = APP.VALEURS.findIndex(v => APP.norm(v) === APP.norm(l)); return i < 0 ? 99 : i; };
+    arbre.children.sort((a, b) => rang(a.label) - rang(b.label));
+    return arbre;
+  }
+
+  // Données d'exemple (noms fictifs), utilisées seulement si riegl.json ne se charge pas
+  function exemple() {
+    const C = { "Nouveauté": ["Innovation", "Transformation"], "Usage": ["Fonctionnalité", "Fréquentation"],
+                "Art": ["Esthétique", "Création"], "Histoire": ["Témoignage", "Évolution"],
+                "Ancienneté": ["Patine", "Rareté"], "Mémoire": ["Commémoration", "Transmission"] };
+    return { label: MODELE.titre, children: APP.VALEURS.map(v => ({
+      label: v, "définition": `Définition de la valeur ${v} (exemple).`,
+      children: C[v].map(c => ({ label: c, "définition": "Caractère d’exemple.",
+        children: [1, 2].map(i => ({ label: `${c} – indicateur ${i}`, "définition": "Indicateur d’exemple.",
+          children: [1, 2, 3].map(j => ({ label: `Attribut ${i}.${j}`, "définition": "Attribut d’exemple.",
+            data: [{ format: "", url: "", "temporalité": "", acteurs: "", source: "", api: "", normes: "", nomemclature: "" }] })) })) })) })) };
+  }
+
+  APP.quandVisible(box, async () => {
+    let arbre, note = "";
+    try {
+      arbre = preparer(await APP.json(MODELE.fichier));
+      if (!arbre.children.length) throw new Error("structure de riegl.json non reconnue");
+    } catch (e) {
+      arbre = preparer(exemple());
+      note = APP.messageErreur(e) + " En attendant, le modèle affiche des données d’exemple (noms fictifs).";
+    }
+    construire(arbre, note);
+  });
+
+  /* ---- 2. Construction de l'interface ---- */
+  function construire(arbre, note) {
+    box.innerHTML = `
+      <div class="modele-gauche">
+        <div class="modele-recherche">
+          <input type="search" placeholder="Rechercher une valeur, un caractère, un attribut…" aria-label="Rechercher dans le modèle" autocomplete="off">
+          <ul hidden></ul>
+        </div>
+        <div class="modele-viz"></div>
+        <div class="modele-legende"></div>
+        ${note ? `<p class="etat erreur">${APP.echap(note)}</p>` : ""}
+      </div>
+      <aside class="panneau modele-panneau" aria-live="polite"></aside>`;
+    const q = box.querySelector(".modele-recherche input");
+    const res = box.querySelector(".modele-recherche ul");
+    const viz = box.querySelector(".modele-viz");
+    const leg = box.querySelector(".modele-legende");
+    const pan = box.querySelector(".modele-panneau");
+
+    const root = d3.hierarchy(arbre, d => d.children).count();
+    d3.partition().size([2 * Math.PI, 1])(root);
+    const noeuds = root.descendants();
+    noeuds.forEach((d, i) => d.id = i);
+    const H = Math.max(1, root.height);
+    const S = 720, R = S / 2 / (H + 1);
+
+    const niveau = d => d.depth ? (APP.NIVEAUX[d.depth - 1] || "Niveau " + d.depth) : "Modèle";
+    const valeurDe = d => d.depth ? d.ancestors().at(-2) : null;
+    const couleurValeur = l => Object.entries(APP.COULEURS).find(([k]) => APP.norm(k) === APP.norm(l))?.[1];
+    const base = d => { const v = valeurDe(d); return v ? (couleurValeur(v.data.label) || v.data.color || "#9aa5a8") : "#e9e6df"; };
+    const remplir = d => d.depth ? d3.interpolateRgb(base(d), "#ffffff")(Math.min(0.65, (d.depth - 1) * 0.22)) : "#fff";
+    const tronquer = (t, n) => t.length <= n ? t : t.slice(0, Math.max(1, n - 1)) + "…";
+    const chemin = d => d.ancestors().reverse().slice(1, -1).map(a => a.data.label).join(" › ");
+
+    // Position d'un nœud quand on zoome sur p : les descendants de p remplissent tous les anneaux
+    const cible = (d, p) => {
+      const k = H / Math.max(1, p.height), rel = d.depth - p.depth, w = p.x1 - p.x0;
+      const x0 = Math.max(0, Math.min(1, (d.x0 - p.x0) / w)) * 2 * Math.PI;
+      const x1 = Math.max(0, Math.min(1, (d.x1 - p.x0) / w)) * 2 * Math.PI;
+      const y0 = rel > 0 ? 1 + (rel - 1) * k : 0;
+      return { x0, x1, y0, y1: rel > 0 ? y0 + k : 0 };
+    };
+    const visible = c => c.y0 >= 1 && c.y1 <= H + 1.001 && c.x1 - c.x0 > 1e-4;
+    const lisible = c => visible(c) && (c.x1 - c.x0) * (c.y0 + c.y1) / 2 * R > 12;
+    const texte = (d, c) => tronquer(d.data.label, Math.floor(((c.y1 - c.y0) * R - 10) / 5.4));
+    const transfo = c => {
+      const x = (c.x0 + c.x1) / 2 * 180 / Math.PI, y = (c.y0 + c.y1) / 2 * R;
+      return `rotate(${x - 90}) translate(${y},0) rotate(${x < 180 ? 0 : 180})`;
+    };
+    const arc = d3.arc().startAngle(c => c.x0).endAngle(c => c.x1)
+      .padAngle(c => Math.min((c.x1 - c.x0) / 2, 0.004)).padRadius(R * 1.5)
+      .innerRadius(c => c.y0 * R).outerRadius(c => Math.max(c.y0 * R, c.y1 * R - 1));
+
+    let focus = root, choisi = root;
+    noeuds.forEach(d => d.current = cible(d, root));
+
+    const bulle = d => `<small>${niveau(d)}</small><br><b>${APP.echap(d.data.label)}</b>`
+      + (d.depth > 1 ? `<br><small>${APP.echap(chemin(d))}</small>` : "")
+      + (d.children ? `<br><small>${d.value} attribut${d.value > 1 ? "s" : ""}</small>` : "");
+
+    const svg = d3.select(viz).append("svg").attr("viewBox", [-S / 2, -S / 2, S, S])
+      .attr("role", "img").attr("aria-label", "Modèle en anneaux : du centre vers l’extérieur, valeurs, caractères, indicateurs puis attributs");
+    const arcs = svg.append("g").selectAll("path").data(noeuds.slice(1)).join("path")
+      .attr("fill", remplir)
+      .attr("fill-opacity", d => visible(d.current) ? 1 : 0)
+      .attr("pointer-events", d => visible(d.current) ? "auto" : "none")
+      .attr("d", d => arc(d.current))
+      .on("click", (e, d) => choisir(d, true))
+      .on("mousemove", (e, d) => APP.tip.montrer(bulle(d), e))
+      .on("mouseleave", () => APP.tip.cacher());
+    const etiquettes = svg.append("g").attr("class", "modele-labels").attr("pointer-events", "none").attr("text-anchor", "middle")
+      .selectAll("text").data(noeuds.slice(1)).join("text").attr("dy", "0.35em")
+      .attr("fill-opacity", d => +lisible(d.current)).attr("transform", d => transfo(d.current)).text(d => texte(d, d.current));
+
+    const centre = svg.append("g").attr("class", "modele-centre").attr("tabindex", 0).attr("role", "button");
+    centre.append("circle").attr("r", R - 3);
+    const cTitre = centre.append("text").attr("class", "t").attr("text-anchor", "middle");
+    const cSous = centre.append("text").attr("class", "s").attr("text-anchor", "middle");
+    const remonter = () => { if (focus.parent) choisir(focus.parent, true); };
+    centre.on("click", remonter).on("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); remonter(); } });
+
+    function majCentre() {
+      const lignes = [];
+      focus.data.label.split(" ").forEach(m => {
+        const l = lignes.at(-1);
+        if (l && (l + " " + m).length <= 14) lignes[lignes.length - 1] = l + " " + m; else lignes.push(m);
+      });
+      const L = lignes.slice(0, 3); if (lignes.length > 3) L[2] += "…";
+      cTitre.selectAll("tspan").data(L).join("tspan").attr("x", 0)
+        .attr("y", (l, i) => (i - (L.length - 1) / 2) * 17 - 4).text(l => l);
+      cSous.attr("y", L.length * 8.5 + 14).text(focus.parent ? "↺ remonter" : "cliquez un anneau");
+      centre.attr("aria-label", focus.parent ? "Remonter vers " + focus.parent.data.label : focus.data.label)
+        .style("cursor", focus.parent ? "pointer" : "default");
+    }
+
+    /* ---- 3. Zoom et sélection ---- */
+    function zoomer(p) {
+      if (!p.children) p = p.parent || root;
+      if (p === focus) return;
+      focus = p;
+      APP.tip.cacher();
+      noeuds.forEach(d => d.target = cible(d, p));
+      const t = svg.transition().duration(reduit ? 0 : 700);
+      arcs.transition(t)
+        .tween("data", d => { const i = d3.interpolate(d.current, d.target); return u => d.current = i(u); })
+        .filter(function (d) { return +this.getAttribute("fill-opacity") || visible(d.target); })
+        .attr("fill-opacity", d => visible(d.target) ? 1 : 0)
+        .attr("pointer-events", d => visible(d.target) ? "auto" : "none")
+        .attrTween("d", d => () => arc(d.current));
+      etiquettes.filter(function (d) { return +this.getAttribute("fill-opacity") || lisible(d.target); })
+        .text(d => texte(d, d.target))
+        .transition(t).attr("fill-opacity", d => +lisible(d.target))
+        .attrTween("transform", d => () => transfo(d.current));
+      majCentre(); majLegende();
+    }
+
+    function choisir(d, zoom) {
+      choisi = d;
+      if (zoom) {
+        if (d.children || d === root) zoomer(d);
+        else if (!d.ancestors().includes(focus)) zoomer(d.parent);
+      }
+      const anc = new Set(d.ancestors());
+      arcs.classed("choisi", x => x === d).classed("chemin", x => x !== d && anc.has(x));
+      afficher(d);
+    }
+
+    /* ---- 4. Panneau de droite ---- */
+    function donnees(d) {
+      const lignes = (d.data.data || []).flatMap(o => Object.entries(MODELE.champs)
+        .filter(([k]) => o && o[k] && String(o[k]).trim())
+        .map(([k, nom]) => {
+          const v = String(o[k]).trim();
+          return `<dt>${nom}</dt><dd>${/^https?:\/\//.test(v)
+            ? `<a href="${APP.echap(v)}" target="_blank" rel="noopener">${APP.echap(v)}</a>` : APP.echap(v)}</dd>`;
+        }));
+      return `<h4>Données associées</h4>` + (lignes.length
+        ? `<dl class="modele-donnees">${lignes.join("")}</dl>`
+        : `<p class="etat">Aucune source renseignée pour l’instant (champs vides dans riegl.json).</p>`);
+    }
+
+    function afficher(d) {
+      const anc = d.ancestors().reverse();
+      const ariane = anc.map((a, i) => i === anc.length - 1
+        ? `<span aria-current="true">${APP.echap(a.data.label)}</span>`
+        : `<button type="button" data-id="${a.id}">${APP.echap(a.data.label)}</button>`).join(" › ");
+      const def = d.data.definition ? `<p class="modele-def">${APP.echap(d.data.definition)}</p>`
+                : d.depth ? `<p class="modele-def vide">Définition à compléter.</p>` : "";
+      let corps = "";
+      if (!d.depth) {
+        const parNiveau = d3.range(1, H + 1).map(k => `<div><b>${noeuds.filter(n => n.depth === k).length}</b>
+          <span>${(APP.NIVEAUX[k - 1] || "niveau " + k).toLowerCase()}s</span></div>`).join("");
+        corps = `<p class="modele-def">Le modèle range ce qui fait la valeur d’un territoire en ${H} niveaux, du centre vers l’extérieur :
+          ${APP.NIVEAUX.slice(0, H).join(" › ")}. Cliquez sur un anneau pour zoomer, sur le centre pour remonter.</p>
+          <div class="modele-chiffres">${parNiveau}</div>`;
+      }
+      if (d.children) corps += `<h4>${d.depth ? "Contient" : "Les valeurs"}</h4><ul class="modele-enfants">${d.children.map(c =>
+          `<li><button type="button" data-id="${c.id}"><span class="pastille" style="--c:${remplir(c)}"></span>${APP.echap(c.data.label)}${c.children ? `<small>${c.value}</small>` : ""}</button></li>`).join("")}</ul>`;
+      else corps += donnees(d);
+      const carte = d.depth ? `<button type="button" class="bouton" data-carte>Voir « ${APP.echap(tronquer(d.data.label, 40))} » sur la carte →</button>
+          <p class="modele-note">Filtre la carte au niveau « ${niveau(d)} ».</p>` : "";
+      pan.innerHTML = `<nav class="modele-ariane" aria-label="Fil d’Ariane">${ariane}</nav>
+        <div class="modele-niveau"><span class="pastille" style="--c:${remplir(d)}"></span>${niveau(d)}</div>
+        <h3>${APP.echap(d.data.label)}</h3>${def}${corps}${carte}`;
+    }
+
+    function versCarte(d) {
+      const ch = {};
+      d.ancestors().reverse().slice(1).forEach(a => ch[niveau(a)] = a.data.label);
+      APP.emit("filtre", { niveau: niveau(d), valeur: d.data.label, chemin: ch });
+      APP.aller("cartes");
+    }
+
+    pan.addEventListener("click", e => {
+      const b = e.target.closest("button"); if (!b) return;
+      if (b.hasAttribute("data-carte")) return versCarte(choisi);
+      if (b.dataset.id) choisir(noeuds[+b.dataset.id], true);
+    });
+
+    /* ---- 5. Légende par familles (cliquer = zoomer, recliquer = revenir) ---- */
+    const valeurs = root.children || [];
+    const familles = Object.entries(APP.FAMILLES).map(([fam, vs]) =>
+      [fam, vs.map(v => valeurs.find(n => APP.norm(n.data.label) === APP.norm(v))).filter(Boolean)]);
+    const autres = valeurs.filter(n => !familles.some(([, ns]) => ns.includes(n)));
+    if (autres.length) familles.push(["Autres", autres]);
+    leg.innerHTML = familles.filter(([, ns]) => ns.length).map(([fam, ns]) => `<div><span class="modele-famille">${fam}</span>
+      <div class="pilules">${ns.map(n => `<button type="button" class="pilule" data-id="${n.id}" aria-pressed="false">
+        <span class="pastille" style="--c:${remplir(n)}"></span>${APP.echap(n.data.label)}</button>`).join("")}</div></div>`).join("");
+    leg.addEventListener("click", e => {
+      const b = e.target.closest("button[data-id]"); if (!b) return;
+      const n = noeuds[+b.dataset.id];
+      choisir(valeurDe(focus) === n ? root : n, true);
+    });
+    function majLegende() {
+      const v = focus.depth ? valeurDe(focus) : null;
+      leg.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(!!v && +b.dataset.id === v.id)));
+    }
+
+    /* ---- 6. Recherche ---- */
+    const index = noeuds.slice(1).map(d => ({ d, n: APP.norm(d.data.label), def: APP.norm(d.data.definition) }));
+    q.addEventListener("input", () => {
+      const v = APP.norm(q.value);
+      if (v.length < 2) { res.hidden = true; return; }
+      const trouves = index.filter(x => x.n.includes(v))
+        .concat(index.filter(x => !x.n.includes(v) && x.def.includes(v))).slice(0, 12);
+      res.innerHTML = trouves.length ? trouves.map(x => `<li><button type="button" data-id="${x.d.id}">
+          <span class="pastille" style="--c:${remplir(x.d)}"></span><b>${APP.echap(x.d.data.label)}</b>
+          <small>${niveau(x.d)}${x.d.depth > 1 ? " · " + APP.echap(chemin(x.d)) : ""}</small></button></li>`).join("")
+        : `<li class="vide">Aucun résultat</li>`;
+      res.hidden = false;
+    });
+    res.addEventListener("click", e => {
+      const b = e.target.closest("button[data-id]"); if (!b) return;
+      choisir(noeuds[+b.dataset.id], true); res.hidden = true; q.value = "";
+    });
+    q.addEventListener("keydown", e => {
+      if (e.key === "Enter") { e.preventDefault(); res.querySelector("button")?.click(); }
+      if (e.key === "Escape") res.hidden = true;
+    });
+    document.addEventListener("click", e => { if (!e.target.closest(".modele-recherche")) res.hidden = true; });
+
+    // Les autres parties peuvent demander d'afficher un élément du modèle
+    APP.on("modele:montrer", label => {
+      const n = noeuds.find(x => x.depth && APP.norm(x.data.label) === APP.norm(label));
+      if (n) { choisir(n, true); APP.aller("modele"); }
+    });
+
+    majCentre(); majLegende(); afficher(root);
+  }
+})();
+
+console.log("✅ Partie 3/4 chargée");
+</script>
+<!-- ===== FIN DE LA PARTIE 3/4 ===== -->
+<!-- ===== PARTIE 4/4 : CARTE INTERACTIVE (MapLibre + filtres + frise + graphiques) ===== -->
+<style>
+#carte-app [hidden]{display:none!important}
+.carte-haut{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;margin-bottom:14px}
+.carte-haut .etat{margin:0}
+.carte-choix .pilule small,.carte-filtres .pilule small{color:var(--gris);font-size:11px;margin-left:3px}
+.carte-grille{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(290px,1fr);gap:22px;align-items:start}
+@media (max-width:960px){.carte-grille{grid-template-columns:1fr}}
+.carte-cadre{position:relative;border-radius:var(--rayon);overflow:hidden}
+#carte-app .carte-map{height:68vh;min-height:420px;width:100%}
+.carte-voile{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(247,245,240,.85);text-align:center}
+.carte-voile>div{max-width:400px;background:#fff;border-radius:14px;padding:18px 22px;box-shadow:0 10px 30px rgba(0,0,0,.12)}
+.carte-frise{margin-top:14px}
+.carte-frise svg{width:100%;height:auto;display:block}
+.carte-frise .axe text{font:11px Barlow,sans-serif;fill:var(--gris)}
+.carte-frise .axe path,.carte-frise .axe line{stroke:#cfd5d6}
+.carte-curseurs{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-top:6px;font-size:14px}
+.carte-curseurs input[type=range]{flex:1;min-width:110px;accent-color:var(--canard)}
+.carte-curseurs b{font:600 20px "Barlow Condensed",sans-serif;color:var(--canard);min-width:90px}
+.carte-filtres{position:sticky;top:20px;max-height:calc(100vh - 40px);overflow:auto}
+.carte-filtres h4{margin:18px 0 6px;font:600 12px Barlow,sans-serif;text-transform:uppercase;letter-spacing:.08em;color:var(--gris)}
+.carte-niveaux label{display:grid;gap:3px;font-size:13px;color:var(--gris);margin:6px 0}
+.carte-niveaux select{font:inherit;font-size:14px;padding:7px 10px;border:1px solid var(--ligne);border-radius:10px;background:#fff;color:var(--encre);max-width:100%}
+.carte-total{margin:14px 0 4px;font-size:14px;color:var(--gris);line-height:1.5}
+.carte-total b{display:block;font:600 34px "Barlow Condensed",sans-serif;color:var(--canard);line-height:1}
+.carte-barres button{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 8px;width:100%;border:0;background:none;padding:5px 2px;cursor:pointer;font:inherit;color:inherit;text-align:left}
+.carte-barres .nom{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+.carte-barres .nb{font-size:13px;color:var(--gris)}
+.carte-barres .barre{grid-column:1/-1;height:8px;border-radius:4px;background:var(--c);min-width:2px;transition:width .3s}
+.carte-barres button:hover .nom,.carte-barres button:focus-visible .nom{text-decoration:underline}
+.carte-radar svg{width:100%;max-width:360px;display:block;margin:auto}
+.carte-radar .lab{font:500 12.5px "Barlow Condensed",sans-serif;fill:var(--encre);cursor:pointer}
+.carte-radar .lab .n{fill:var(--gris);font-size:11px}
+.carte-annonce{background:#e8f3f4;border-radius:10px;padding:8px 12px;font-size:14px;margin-bottom:10px}
+.carte-annonce button{border:0;background:none;color:var(--canard);text-decoration:underline;cursor:pointer;font:inherit;padding:0;margin-left:4px}
+.carte-dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:14px;margin:6px 0 12px}
+.carte-dl dt{color:var(--gris)}
+.carte-dl dd{margin:0;word-break:break-word}
+</style>
+
+<script>
+/* ============================================================
+   RÉGLAGES DES CARTES — vérifier les chemins dans les anciens config.js
+   (poids en Mo : au-delà de "seuilMo", on demande avant de charger)
+   ============================================================ */
+const CARTES = {
+  valeurs:    { nom: "Valeurs",      poids: 162,  fichiers: ["maps/Valeurs/data/polygones.json", "maps/Valeurs/data/points.json"] },
+  anciennete: { nom: "Ancienneté",   poids: 53,   fichiers: ["maps/Anciennete/data/surfaces.json", "maps/Anciennete/data/points.json"] },
+  objectif12: { nom: "Objectif 1.2", poids: null, fichiers: ["maps/Objectif 1.2/data/polygones.json", "maps/Objectif 1.2/data/points.json"] },
+  objectif13: { nom: "Objectif 1.3", poids: null, fichiers: ["maps/Objectif 1.3/data/surfaces.json", "maps/Objectif 1.3/data/lignes.json", "maps/Objectif 1.3/data/points.json"] }
+};
+const CARTE_REGLAGES = {
+  depart: "objectif12",                       // carte affichée à l'ouverture
+  seuilMo: 40,
+  contour: "maps/Objectif 1.2/data/pnr.json", // périmètres des PNR
+  centre: [-2.25, 47.37], zoom: 9.5,          // Brière
+  corrections: [[/Rarreté/g, "Rareté"]]
+};
+
+/* ============================================================
+   06 · CARTES : une seule carte, filtres cumulés, frise, barres, radar
+   ============================================================ */
+(function cartes() {
+  const box = document.getElementById("carte-app");
+  if (!box) return;
+  const reduit = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const NIVS = ["Caractère", "Indicateur", "Attribut"];
+  const ORDRE = ["Valeur", ...NIVS];
+  const ALIAS = { Valeur: ["valeur", "valeurs"], "Caractère": ["caractere", "caracteres"], Indicateur: ["indicateur", "indicateurs"],
+                  Attribut: ["attribut", "attributs"], Annee: ["annee", "annees", "date", "year"] };
+  const CONNUES = new Set(Object.values(ALIAS).flat());
+  const AUCUN = new Set();
+  const GEOM = {
+    surfaces: ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]],
+    lignes:   ["in", ["geometry-type"], ["literal", ["LineString", "MultiLineString"]]],
+    points:   ["in", ["geometry-type"], ["literal", ["Point", "MultiPoint"]]]
+  };
+  const COUCHES = ["objets-points", "objets-lignes", "objets-surfaces"];
+  const VIDE = { type: "FeatureCollection", features: [] };
+
+  const corriger = v => CARTE_REGLAGES.corrections.reduce((t, [a, b]) => t.replace(a, b), String(v ?? "").trim());
+  const an = v => {
+    if (v == null || v === "") return -1;
+    if (typeof v === "number") return v > 3000 ? new Date(v).getFullYear() : Math.round(v);
+    const m = String(v).match(/\d{4}/); return m ? +m[0] : -1;
+  };
+  const couleurValeur = l => Object.entries(APP.COULEURS).find(([k]) => APP.norm(k) === APP.norm(l))?.[1] || "#9aa5a8";
+  const rang = l => { const i = APP.VALEURS.findIndex(v => APP.norm(v) === APP.norm(l)); return i < 0 ? 99 : i; };
+  const fr = n => n.toLocaleString("fr-FR");
+
+  const etat = { carte: null, valeurs: new Set(), "Caractère": "", Indicateur: "", Attribut: "", a0: null, a1: null, sansDate: true };
+  let objets = [], bornes = null, attente = null, jeton = 0, lecture = null, fiche = null, map = null, pret = null, prevu = false;
+  const cache = new Map();
+
+  /* ---- 1. Interface ---- */
+  box.classList.remove("app-vide"); box.classList.add("carte");
+  box.innerHTML = `
+    <div class="carte-haut">
+      <div class="pilules carte-choix" role="group" aria-label="Choisir une carte">${Object.entries(CARTES).map(([k, c]) =>
+        `<button type="button" class="pilule" data-carte="${k}" aria-pressed="false">${c.nom}${c.poids ? `<small>≈ ${c.poids} Mo</small>` : ""}</button>`).join("")}</div>
+      <p class="etat carte-poids"></p>
+    </div>
+    <div class="carte-grille">
+      <div>
+        <div class="carte-cadre">
+          <div class="map carte-map"></div>
+          <div class="carte-voile"><div><p>Chargement de la carte…</p></div></div>
+        </div>
+        <div class="panneau carte-frise" hidden>
+          <div class="carte-histo"></div>
+          <div class="carte-curseurs">
+            <b class="carte-annees"></b>
+            <label>De <input type="range" class="carte-deb" aria-label="Année de début"></label>
+            <label>à <input type="range" class="carte-fin" aria-label="Année de fin"></label>
+            <button type="button" class="bouton leger carte-lecture">▶ Animer</button>
+            <label><input type="checkbox" class="carte-sansdate" checked> inclure les objets sans date <small class="carte-nsd"></small></label>
+          </div>
+        </div>
+        <p class="etat carte-etat"></p>
+      </div>
+      <aside class="panneau carte-filtres">
+        <div class="carte-annonce" hidden></div>
+        <h4>Valeurs</h4>
+        <div class="pilules carte-valeurs"></div>
+        <h4>Affiner</h4>
+        <div class="carte-niveaux">${NIVS.map(n => `<label>${n}<select data-niv="${n}"></select></label>`).join("")}</div>
+        <button type="button" class="bouton leger carte-raz">Tout réinitialiser</button>
+        <div class="carte-total" aria-live="polite"></div>
+        <h4 class="carte-barres-titre">Répartition</h4>
+        <div class="carte-barres"></div>
+        <h4>Profil des 6 valeurs</h4>
+        <div class="carte-radar"></div>
+        <div class="carte-fiche"></div>
+      </aside>
+    </div>`;
+  const $ = s => box.querySelector(s);
+  const choix = $(".carte-choix"), poidsEl = $(".carte-poids"), mapEl = $(".carte-map"), voile = $(".carte-voile");
+  const friseEl = $(".carte-frise"), histo = $(".carte-histo"), anneesEl = $(".carte-annees");
+  const deb = $(".carte-deb"), fin = $(".carte-fin"), lectureBtn = $(".carte-lecture"), sansDateCb = $(".carte-sansdate"), nsd = $(".carte-nsd");
+  const etatEl = $(".carte-etat"), annonce = $(".carte-annonce"), valeursEl = $(".carte-valeurs");
+  const selects = Object.fromEntries(NIVS.map(n => [n, box.querySelector(`select[data-niv="${n}"]`)]));
+  const totalEl = $(".carte-total"), barresTitre = $(".carte-barres-titre"), barresEl = $(".carte-barres"), radarEl = $(".carte-radar"), ficheEl = $(".carte-fiche");
+
+  const voileMsg = html => { voile.firstElementChild.innerHTML = html; voile.hidden = false; };
+
+  /* ---- 2. Lecture des fichiers (avec progression) et normalisation ---- */
+  async function lireJSON(chemin, progres) {
+    const r = await fetch(APP.url(chemin));
+    if (!r.ok) throw new Error(`${chemin} introuvable (${r.status})`);
+    if (!r.body || !r.body.getReader) return r.json();
+    const lecteur = r.body.getReader(), morceaux = []; let lu = 0;
+    for (;;) {
+      const { done, value } = await lecteur.read();
+      if (done) break;
+      morceaux.push(value); lu += value.length; progres(lu);
+    }
+    return JSON.parse(await new Blob(morceaux).text());
+  }
+
+  function normaliser(feats, src) {
+    const vus = new Set();
+    feats.slice(0, 300).forEach(f => Object.keys(f?.properties || {}).forEach(k => vus.add(k)));
+    const cles = {};
+    for (const [n, al] of Object.entries(ALIAS)) cles[n] = [...vus].find(k => al.includes(APP.norm(k)));
+    return feats.filter(Boolean).map(f => {
+      const p = f.properties = f.properties || {};
+      p.Valeur = corriger(p[cles.Valeur]) || "Non renseigné";
+      NIVS.forEach(n => p[n] = corriger(p[cles[n]]));
+      p._an = an(p[cles.Annee]);                    // "Annee" ou "annee"
+      p._c = couleurValeur(p.Valeur);
+      p._g = f.geometry && f.geometry.type && f.geometry.coordinates?.length ? 1 : 0;
+      p._src = String(src).split("/").pop();
+      return f;
+    });
+  }
+
+  // Données fictives autour de la Brière, utilisées seulement si les fichiers ne se chargent pas
+  function exemple(graine) {
+    let s = graine; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+    const C = { "Nouveauté": ["Innovation", "Transformation"], "Usage": ["Fonctionnalité", "Fréquentation"],
+                "Art": ["Esthétique", "Création"], "Histoire": ["Témoignage", "Évolution"],
+                "Ancienneté": ["Patine", "Rareté"], "Mémoire": ["Commémoration", "Transmission"] };
+    const poids = [5, 8, 3, 6, 7, 4];
+    const tirage = APP.VALEURS.flatMap((v, i) => Array(poids[i]).fill(v));
+    const [cx, cy] = CARTE_REGLAGES.centre, k = 0.006;
+    return d3.range(900).map(() => {
+      const v = tirage[Math.floor(rnd() * tirage.length)], c = C[v][Math.floor(rnd() * 2)];
+      const i = 1 + Math.floor(rnd() * 2), j = 1 + Math.floor(rnd() * 3);
+      const x = cx + (rnd() - 0.5) * 0.5, y = cy + (rnd() - 0.5) * 0.3, t = rnd();
+      const geometry = t < 0.08 ? null
+        : t < 0.55 ? { type: "Point", coordinates: [x, y] }
+        : t < 0.85 ? { type: "Polygon", coordinates: [[[x, y], [x + k, y], [x + k, y + k * 0.7], [x, y + k * 0.7], [x, y]]] }
+        : { type: "LineString", coordinates: [[x, y], [x + (rnd() - 0.5) * 0.04, y + (rnd() - 0.5) * 0.03], [x + (rnd() - 0.5) * 0.06, y + (rnd() - 0.5) * 0.04]] };
+      return { type: "Feature", geometry, properties: { Valeur: v, "Caractère": c, Indicateur: `${c} – indicateur ${i}`,
+               Attribut: `Attribut ${i}.${j}`, Annee: rnd() < 0.1 ? null : Math.round(1950 + Math.pow(rnd(), 0.6) * 74) } };
+    });
+  }
+
+  async function lire(cle, progres) {
+    const c = CARTES[cle]; let tout = []; const erreurs = [];
+    for (const [i, f] of c.fichiers.entries()) {
+      try {
+        const j = await lireJSON(f, lu => progres(`Fichier ${i + 1}/${c.fichiers.length} : ${(lu / 1e6).toFixed(1)} Mo reçus`));
+        tout = tout.concat(normaliser(Array.isArray(j) ? j : (j.features || []), f));
+      } catch (e) { erreurs.push([f, e]); }
+    }
+    let note = "";
+    if (!tout.length) {
+      note = APP.messageErreur(erreurs[0]?.[1] || new Error("aucun objet")) + " En attendant, la carte affiche des données d’exemple (fictives).";
+      tout = normaliser(exemple(7 + Object.keys(CARTES).indexOf(cle) * 101), "exemple");
+    } else if (erreurs.length) note = "Fichiers non chargés : " + erreurs.map(([f, e]) => `${f} (${e.message})`).join(" ; ");
+    return { objets: tout, geo: tout.filter(f => f.properties._g), note };
+  }
+
+  /* ---- 3. Filtres : la même règle pour la carte (expression) et pour les chiffres (JS) ---- */
+  const passe = (p, sauf) =>
+    (sauf.has("Valeur") || !etat.valeurs.size || etat.valeurs.has(p.Valeur)) &&
+    NIVS.every(n => sauf.has(n) || !etat[n] || p[n] === etat[n]) &&
+    (sauf.has("Annee") || etat.a0 == null || (p._an < 0 ? etat.sansDate : p._an >= etat.a0 && p._an <= etat.a1));
+
+  function conditions() {
+    const c = [];
+    if (etat.valeurs.size) c.push(["in", ["get", "Valeur"], ["literal", [...etat.valeurs]]]);
+    NIVS.forEach(n => etat[n] && c.push(["==", ["get", n], etat[n]]));
+    if (etat.a0 != null) {
+      const a = ["to-number", ["get", "_an"]];
+      const d = ["all", [">=", a, etat.a0], ["<=", a, etat.a1]];
+      c.push(etat.sansDate ? ["any", ["<", a, 0], d] : d);
+    }
+    return c;
+  }
+  function majCarte() {
+    if (!map || !map.getLayer("objets-points")) return;
+    const c = conditions();
+    map.setFilter("objets-surfaces", ["all", GEOM.surfaces, ...c]);
+    map.setFilter("objets-lignes", ["all", GEOM.lignes, ...c]);
+    map.setFilter("objets-points", ["all", GEOM.points, ...c]);
+  }
+  const compter = n => {
+    const sauf = new Set(ORDRE.slice(ORDRE.indexOf(n)));
+    return d3.rollup(objets.filter(o => passe(o.properties, sauf)), v => v.length, o => o.properties[n]);
+  };
+
+  /* ---- 4. Mise à jour générale ---- */
+  let rafEnCours = false;
+  const planifier = () => { if (!rafEnCours) { rafEnCours = true; requestAnimationFrame(() => { rafEnCours = false; maj(); }); } };
+
+  function maj() {
+    majCarte();
+    // Curseurs
+    if (bornes) {
+      deb.value = etat.a0; fin.value = etat.a1;
+      anneesEl.textContent = etat.a0 === etat.a1 ? etat.a0 : `${etat.a0} – ${etat.a1}`;
+    }
+    sansDateCb.checked = etat.sansDate;
+    // Pilules de valeurs (nombres = ce qu'on obtiendrait en choisissant la valeur)
+    const parValeur = compter("Valeur");
+    valeursEl.querySelectorAll("button").forEach(b => {
+      const v = b.dataset.v;
+      b.setAttribute("aria-pressed", String(v ? etat.valeurs.has(v) : !etat.valeurs.size));
+      const s = b.querySelector("small"); if (s && v) s.textContent = fr(parValeur.get(v) || 0);
+    });
+    // Listes Caractère / Indicateur / Attribut (dépendent des filtres au-dessus)
+    NIVS.forEach(n => {
+      const comptes = compter(n); comptes.delete(""); comptes.delete(undefined);
+      if (etat[n] && !comptes.has(etat[n])) comptes.set(etat[n], 0);
+      const opts = [...comptes].sort((a, b) => String(a[0]).localeCompare(String(b[0]), "fr", { numeric: true }));
+      selects[n].innerHTML = `<option value="">Tous (${opts.length})</option>` +
+        opts.map(([v, c]) => `<option value="${APP.echap(v)}">${APP.echap(v)} (${fr(c)})</option>`).join("");
+      selects[n].value = etat[n]; selects[n].disabled = !opts.length;
+    });
+    // Total (y compris les objets sans géométrie)
+    const filtres = objets.filter(o => passe(o.properties, AUCUN));
+    const sansGeo = filtres.filter(o => !o.properties._g).length;
+    const sansDate = filtres.filter(o => o.properties._an < 0).length;
+    totalEl.innerHTML = `<b>${fr(filtres.length)}</b>objet${filtres.length > 1 ? "s" : ""} sur ${fr(objets.length)}`
+      + (sansGeo ? `<br>dont ${fr(sansGeo)} sans géométrie (comptés, mais absents de la carte)` : "")
+      + (sansDate ? `<br>dont ${fr(sansDate)} sans date` : "");
+    barres(filtres);
+    radar(parValeur);
+    frise(objets.filter(o => passe(o.properties, new Set(["Annee"]))));
+    if (attente === null && annonce.dataset.actif && !filtres.length)
+      annonce.innerHTML = annonce.dataset.actif + `<br><small>Aucun objet de cette carte ne correspond : essayez une autre carte.</small> <button type="button" data-effacer>Effacer</button>`;
+  }
+
+  /* ---- 5. Barres : répartition au niveau en dessous du filtre actif (clic = filtrer) ---- */
+  function barres(filtres) {
+    const niv = etat.Indicateur ? "Attribut" : etat["Caractère"] ? "Indicateur" : etat.valeurs.size === 1 ? "Caractère" : "Valeur";
+    const groupes = d3.rollups(filtres, v => ({ n: v.length, c: v[0].properties._c }), o => o.properties[niv] || "(vide)")
+      .sort((a, b) => b[1].n - a[1].n);
+    const top = groupes.slice(0, 10), max = top[0]?.[1].n || 1;
+    barresTitre.textContent = "Répartition par " + niv.toLowerCase();
+    barresEl.innerHTML = top.length
+      ? top.map(([k, d]) => `<button type="button" data-niv="${niv}" data-v="${APP.echap(k)}" title="Filtrer sur « ${APP.echap(k)} »">
+          <span class="nom">${APP.echap(k)}</span><span class="nb">${fr(d.n)}</span>
+          <span class="barre" style="width:${100 * d.n / max}%;--c:${d.c}"></span></button>`).join("")
+        + (groupes.length > 10 ? `<p class="etat">+ ${groupes.length - 10} autres</p>` : "")
+      : `<p class="etat">Aucun objet ne correspond à ces filtres.</p>`;
+  }
+
+  /* ---- 6. Radar D3 : profil des 6 valeurs (clic sur un nom = filtrer) ---- */
+  function radar(parValeur) {
+    const cles = [...parValeur.keys()];
+    const vals = APP.VALEURS.map(v => { const k = cles.find(x => APP.norm(x) === APP.norm(v)) || v; return { v, k, n: parValeur.get(k) || 0 }; });
+    const R = 95, max = d3.max(vals, d => d.n) || 1, r = d3.scaleLinear([0, max], [0, R]);
+    const ang = i => i / vals.length * 2 * Math.PI - Math.PI / 2;
+    const svg = d3.select(radarEl).selectAll("svg").data([0]).join("svg").attr("viewBox", [-200, -145, 400, 290])
+      .attr("role", "img").attr("aria-label", "Radar du nombre d’objets par valeur");
+    svg.selectAll("circle.grille").data([0.25, 0.5, 0.75, 1]).join("circle").attr("class", "grille")
+      .attr("r", t => t * R).attr("fill", "none").attr("stroke", "#e3e0d8");
+    svg.selectAll("line.axe").data(vals).join("line").attr("class", "axe").attr("stroke", "#e3e0d8")
+      .attr("x2", (d, i) => Math.cos(ang(i)) * R).attr("y2", (d, i) => Math.sin(ang(i)) * R);
+    const pts = vals.map((d, i) => [Math.cos(ang(i)) * r(d.n), Math.sin(ang(i)) * r(d.n)]);
+    const t = svg.transition().duration(reduit ? 0 : 300);
+    svg.selectAll("path.forme").data([pts]).join("path").attr("class", "forme")
+      .attr("fill", "rgba(46,124,134,.18)").attr("stroke", "#2e7c86").attr("stroke-width", 1.5)
+      .transition(t).attr("d", p => d3.line()(p) + "Z");
+    svg.selectAll("circle.pt").data(vals).join("circle").attr("class", "pt").attr("r", 4.5)
+      .attr("fill", d => APP.couleur(d.v)).attr("stroke", "#fff")
+      .transition(t).attr("cx", (d, i) => pts[i][0]).attr("cy", (d, i) => pts[i][1]);
+    svg.selectAll("text.lab").data(vals).join("text").attr("class", "lab")
+      .attr("text-anchor", (d, i) => { const c = Math.cos(ang(i)); return Math.abs(c) < 0.3 ? "middle" : c > 0 ? "start" : "end"; })
+      .attr("x", (d, i) => Math.cos(ang(i)) * (R + 10))
+      .attr("y", (d, i) => { const s = Math.sin(ang(i)); return s * (R + 12) + (s < -0.3 ? -12 : s > 0.3 ? 8 : -4); })
+      .attr("font-weight", d => etat.valeurs.has(d.k) ? 700 : 400)
+      .each(function (d) {
+        const el = d3.select(this);
+        el.selectAll("tspan").data([d.v, fr(d.n)]).join("tspan").attr("x", el.attr("x"))
+          .attr("dy", (s, i) => i ? "1.2em" : 0).attr("class", (s, i) => i ? "n" : null).text(s => s);
+      })
+      .on("click", (e, d) => basculerValeur(d.k));
+  }
+
+  /* ---- 7. Frise des années (histogramme D3 + curseurs) ---- */
+  function frise(liste) {
+    if (!bornes) return;
+    const pas = bornes[1] - bornes[0] > 80 ? 5 : bornes[1] - bornes[0] > 40 ? 2 : 1;
+    const bac = a => bornes[0] + Math.floor((a - bornes[0]) / pas) * pas;
+    const comptes = d3.rollups(liste.filter(o => o.properties._an >= 0), v => v.length, o => bac(o.properties._an));
+    nsd.textContent = `(${fr(liste.filter(o => o.properties._an < 0).length)})`;
+    const W = 600, H = 74;
+    const x = d3.scaleLinear([bornes[0], bornes[1] + pas], [10, W - 10]);
+    const y = d3.scaleLinear([0, d3.max(comptes, d => d[1]) || 1], [0, H - 20]);
+    const svg = d3.select(histo).selectAll("svg").data([0]).join("svg").attr("viewBox", [0, 0, W, H])
+      .attr("role", "img").attr("aria-label", "Nombre d’objets par année");
+    svg.selectAll("rect").data(comptes, d => d[0]).join("rect")
+      .attr("x", d => x(d[0]) + 0.5).attr("width", d => Math.max(1, x(d[0] + pas) - x(d[0]) - 1))
+      .attr("y", d => H - 16 - y(d[1])).attr("height", d => y(d[1]))
+      .attr("fill", d => d[0] + pas - 1 >= etat.a0 && d[0] <= etat.a1 ? "#2e7c86" : "#cfd5d6")
+      .on("mousemove", (e, d) => APP.tip.montrer(`<b>${d[0]}${pas > 1 ? "–" + (d[0] + pas - 1) : ""}</b><br>${fr(d[1])} objet${d[1] > 1 ? "s" : ""}`, e))
+      .on("mouseleave", () => APP.tip.cacher());
+    svg.selectAll("g.axe").data([0]).join("g").attr("class", "axe").attr("transform", `translate(0,${H - 16})`)
+      .call(d3.axisBottom(x).ticks(6).tickFormat(d3.format("d")).tickSizeOuter(0));
+  }
+
+  /* ---- 8. Actions de l'utilisateur ---- */
+  const viderSous = n => NIVS.slice(NIVS.indexOf(n) + 1).forEach(m => etat[m] = "");
+  function basculerValeur(v) {
+    etat.valeurs.has(v) ? etat.valeurs.delete(v) : etat.valeurs.add(v);
+    NIVS.forEach(n => etat[n] = ""); maj();
+  }
+  valeursEl.addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (!b.dataset.v) { etat.valeurs.clear(); NIVS.forEach(n => etat[n] = ""); maj(); }
+    else basculerValeur(b.dataset.v);
+  });
+  NIVS.forEach(n => selects[n].addEventListener("change", () => { etat[n] = selects[n].value; viderSous(n); maj(); }));
+  barresEl.addEventListener("click", e => {
+    const b = e.target.closest("button[data-niv]"); if (!b || b.dataset.v === "(vide)") return;
+    if (b.dataset.niv === "Valeur") { etat.valeurs = new Set([b.dataset.v]); NIVS.forEach(n => etat[n] = ""); }
+    else { etat[b.dataset.niv] = b.dataset.v; viderSous(b.dataset.niv); }
+    maj();
+  });
+  function stopLecture() { clearInterval(lecture); lecture = null; lectureBtn.textContent = "▶ Animer"; }
+  deb.addEventListener("input", () => { stopLecture(); etat.a0 = +deb.value; if (etat.a0 > etat.a1) etat.a1 = etat.a0; planifier(); });
+  fin.addEventListener("input", () => { stopLecture(); etat.a1 = +fin.value; if (etat.a1 < etat.a0) etat.a0 = etat.a1; planifier(); });
+  sansDateCb.addEventListener("change", () => { etat.sansDate = sansDateCb.checked; maj(); });
+  lectureBtn.addEventListener("click", () => {
+    if (lecture) return stopLecture();
+    if (!bornes) return;
+    const pas = Math.max(1, Math.round((bornes[1] - bornes[0]) / 40));
+    etat.a0 = bornes[0]; etat.a1 = bornes[0]; maj();
+    lectureBtn.textContent = "⏸ Pause";
+    lecture = setInterval(() => {
+      etat.a1 = Math.min(bornes[1], etat.a1 + pas); maj();
+      if (etat.a1 >= bornes[1]) stopLecture();
+    }, 300);
+  });
+  function toutReinitialiser() {
+    stopLecture(); etat.valeurs.clear(); NIVS.forEach(n => etat[n] = "");
+    if (bornes) { etat.a0 = bornes[0]; etat.a1 = bornes[1]; }
+    etat.sansDate = true; annonce.hidden = true; delete annonce.dataset.actif; montrerFiche(null); maj();
+  }
+  $(".carte-raz").addEventListener("click", toutReinitialiser);
+  annonce.addEventListener("click", e => { if (e.target.closest("[data-effacer]")) toutReinitialiser(); });
+  choix.addEventListener("click", e => { const b = e.target.closest("button[data-carte]"); if (b) ouvrir(b.dataset.carte); });
+  voile.addEventListener("click", e => { const b = e.target.closest("[data-charger]"); if (b) ouvrir(b.dataset.charger, true); });
+
+  /* ---- 9. Fiche d'un objet cliqué ---- */
+  function montrerFiche(p) {
+    fiche = p;
+    if (!p) { ficheEl.innerHTML = ""; return; }
+    const autres = Object.entries(p).filter(([k, v]) => !k.startsWith("_") && !CONNUES.has(APP.norm(k))
+      && v !== null && v !== "" && typeof v !== "object").slice(0, 8);
+    ficheEl.innerHTML = `<h4>Objet sélectionné</h4><dl class="carte-dl">
+      ${ORDRE.filter(n => p[n]).map(n => `<dt>${n}</dt><dd>${APP.echap(p[n])}</dd>`).join("")}
+      <dt>Année</dt><dd>${p._an >= 0 ? p._an : "non datée"}</dd>
+      ${autres.map(([k, v]) => `<dt>${APP.echap(k)}</dt><dd>${/^https?:\/\//.test(v)
+        ? `<a href="${APP.echap(v)}" target="_blank" rel="noopener">lien ↗</a>` : APP.echap(v)}</dd>`).join("")}
+      <dt>Fichier</dt><dd>${APP.echap(p._src)}</dd></dl>
+      <button type="button" class="bouton leger" data-modele>Voir dans le modèle ↑</button>`;
+  }
+  ficheEl.addEventListener("click", e => {
+    if (e.target.closest("[data-modele]") && fiche) ORDRE.forEach(n => fiche[n] && APP.emit("modele:montrer", fiche[n]));
+  });
+
+  /* ---- 10. Carte MapLibre ---- */
+  function creerCarte() {
+    map = new maplibregl.Map({ container: mapEl, style: APP.FOND, center: CARTE_REGLAGES.centre, zoom: CARTE_REGLAGES.zoom,
+      cooperativeGestures: true, attributionControl: { compact: true }, locale: APP.LOCALE_CARTE });
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+    map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-left");
+    new ResizeObserver(() => map.resize()).observe(mapEl);
+    pret = new Promise(ok => map.on("load", ok)).then(() => {
+      map.addSource("pnr", { type: "geojson", data: VIDE });
+      map.addSource("objets", { type: "geojson", data: VIDE });
+      map.addLayer({ id: "pnr-fond", type: "fill", source: "pnr", paint: { "fill-color": "#2e7c86", "fill-opacity": 0.04 } });
+      map.addLayer({ id: "pnr-ligne", type: "line", source: "pnr", paint: { "line-color": "#2e7c86", "line-width": 1.5, "line-dasharray": [3, 2] } });
+      map.addLayer({ id: "objets-surfaces", type: "fill", source: "objets", filter: GEOM.surfaces,
+        paint: { "fill-color": ["get", "_c"], "fill-opacity": 0.5, "fill-outline-color": "#ffffff" } });
+      map.addLayer({ id: "objets-lignes", type: "line", source: "objets", filter: GEOM.lignes,
+        paint: { "line-color": ["get", "_c"], "line-width": ["interpolate", ["linear"], ["zoom"], 8, 1, 14, 3] } });
+      map.addLayer({ id: "objets-points", type: "circle", source: "objets", filter: GEOM.points,
+        paint: { "circle-color": ["get", "_c"], "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 2, 14, 6],
+                 "circle-stroke-color": "#fff", "circle-stroke-width": 0.6, "circle-opacity": 0.9 } });
+      map.on("mousemove", e => {
+        const f = map.queryRenderedFeatures(e.point, { layers: COUCHES })[0];
+        map.getCanvas().style.cursor = f ? "pointer" : "";
+        if (!f) return APP.tip.cacher();
+        const p = f.properties;
+        APP.tip.montrer(`<span class="pastille" style="--c:${p._c}"></span> <b>${APP.echap(p.Valeur)}</b>`
+          + NIVS.filter(n => p[n]).map(n => `<br><small>${n} :</small> ${APP.echap(p[n])}`).join("")
+          + `<br><small>Année :</small> ${p._an >= 0 ? p._an : "non datée"}`, e.originalEvent);
+      });
+      map.on("mouseout", () => APP.tip.cacher());
+      map.on("click", e => montrerFiche(map.queryRenderedFeatures(e.point, { layers: COUCHES })[0]?.properties || null));
+      majCarte();
+    });
+    APP.json(CARTE_REGLAGES.contour).then(d => pret.then(() => map.getSource("pnr").setData(d))).catch(() => {});
+  }
+
+  function cadrer(d) {
+    if (!d.geo.length) return;
+    if (!d.bbox) {
+      const b = [180, 90, -180, -90];
+      d.geo.forEach(f => { try { const c = APP.bbox(f.geometry);
+        b[0] = Math.min(b[0], c[0]); b[1] = Math.min(b[1], c[1]); b[2] = Math.max(b[2], c[2]); b[3] = Math.max(b[3], c[3]); } catch (e) {} });
+      d.bbox = b;
+    }
+    const b = d.bbox;
+    if (b[0] >= -180 && b[2] <= 180 && b[1] >= -90 && b[3] <= 90 && b[0] < b[2])
+      map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: 30, duration: reduit ? 0 : 600, maxZoom: 14 });
+  }
+
+  /* ---- 11. Changer de carte ---- */
+  async function ouvrir(cle, force) {
+    const c = CARTES[cle]; if (!c) return;
+    stopLecture(); etat.carte = cle; const moi = ++jeton;
+    choix.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.carte === cle)));
+    poidsEl.textContent = `${c.fichiers.length} fichier${c.fichiers.length > 1 ? "s" : ""}` + (c.poids ? ` · environ ${c.poids} Mo à télécharger` : "");
+    if (!cache.has(cle)) {
+      if (c.poids >= CARTE_REGLAGES.seuilMo && !force) {
+        installer({ objets: [], geo: [], note: "" }, true);
+        return voileMsg(`<p><b>⚠ Carte lourde</b><br>« ${c.nom} » pèse environ ${c.poids} Mo.
+          Le chargement peut prendre une minute et ralentir un ordinateur modeste.</p>
+          <button type="button" class="bouton" data-charger="${cle}">Charger quand même</button>`);
+      }
+      if (c.poids >= CARTE_REGLAGES.seuilMo) cache.clear();   // libère la mémoire avant un gros fichier
+      voileMsg(`<p>Chargement de « ${c.nom} »…</p><p class="etat carte-progres"></p>`);
+      const d = await lire(cle, txt => { const el = voile.querySelector(".carte-progres"); if (moi === jeton && el) el.textContent = txt; });
+      cache.set(cle, d);
+    }
+    if (moi === jeton) installer(cache.get(cle));
+  }
+
+  function installer(d, garderVoile) {
+    objets = d.objets;
+    const ans = objets.map(o => o.properties._an).filter(a => a >= 0);
+    bornes = ans.length ? [d3.min(ans), d3.max(ans)] : null;
+    etat.a0 = bornes ? bornes[0] : null; etat.a1 = bornes ? bornes[1] : null;
+    if (!bornes) etat.sansDate = true;
+    if (bornes) [deb, fin].forEach(r => { r.min = bornes[0]; r.max = bornes[1]; r.step = 1; });
+    friseEl.hidden = !bornes;
+    if (attente && objets.length) { appliquerChemin(attente); attente = null; }
+    else {   // on garde les filtres qui existent dans la nouvelle carte
+      const present = (n, v) => objets.some(o => o.properties[n] === v);
+      etat.valeurs = new Set([...etat.valeurs].filter(v => present("Valeur", v)));
+      NIVS.forEach(n => { if (etat[n] && !present(n, etat[n])) etat[n] = ""; });
+    }
+    const presentes = d3.rollup(objets, v => v.length, o => o.properties.Valeur);
+    valeursEl.innerHTML = `<button type="button" class="pilule" data-v="" aria-pressed="true">Toutes</button>` +
+      [...presentes.keys()].sort((a, b) => rang(a) - rang(b) || a.localeCompare(b, "fr")).map(v =>
+        `<button type="button" class="pilule" data-v="${APP.echap(v)}" aria-pressed="false"><span class="pastille" style="--c:${couleurValeur(v)}"></span>${APP.echap(v)}<small></small></button>`).join("");
+    montrerFiche(null);
+    pret.then(() => { map.getSource("objets").setData({ type: "FeatureCollection", features: d.geo }); majCarte(); cadrer(d); });
+    if (!garderVoile) voile.hidden = true;
+    etatEl.textContent = d.note; etatEl.classList.toggle("erreur", !!d.note);
+    maj();
+  }
+
+  /* ---- 12. Filtre envoyé par le modèle (partie 3) ---- */
+  function appliquerChemin(ch) {
+    const trouver = (n, v) => { const nv = APP.norm(v); const o = objets.find(o => APP.norm(o.properties[n]) === nv); return o ? o.properties[n] : v; };
+    etat.valeurs = new Set(ch.Valeur ? [trouver("Valeur", ch.Valeur)] : []);
+    NIVS.forEach(n => etat[n] = ch[n] ? trouver(n, ch[n]) : "");
+    if (bornes) { etat.a0 = bornes[0]; etat.a1 = bornes[1]; }
+  }
+  APP.on("filtre", d => {
+    const ch = d.chemin || { [d.niveau]: d.valeur };
+    annonce.dataset.actif = `Filtre venu du modèle : <b>${APP.echap(d.valeur)}</b> (${APP.echap(d.niveau)})`;
+    annonce.innerHTML = annonce.dataset.actif + ` <button type="button" data-effacer>Effacer</button>`;
+    annonce.hidden = false;
+    if (!objets.length) { attente = ch; return; }
+    appliquerChemin(ch); maj();
+  });
+
+  /* ---- 13. Démarrage quand la section approche de l'écran ---- */
+  APP.quandVisible(box, () => { if (prevu) return; prevu = true; creerCarte(); ouvrir(CARTE_REGLAGES.depart); });
+})();
+
+console.log("✅ Partie 4/4 chargée — page complète");
+</script>
+<!-- ===== FIN DE LA PARTIE 4/4 ===== -->

@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>#DAL 2024 · Parricus Natura Regionalis</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;500;600&family=Barlow+Condensed:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root { --papier:#f7f5f0; --encre:#4a4a47; --gris:#8f8c86; --filet:#dcd8d0; --titre:#2e7c86; --nav:260px; }
+* { box-sizing:border-box; margin:0; padding:0; }
+html { scroll-behavior:smooth; scroll-snap-type:y proximity; }
+body { font-family:'Barlow',sans-serif; background:var(--papier); color:var(--encre); }
+
+/* ====== BARRE DE PROGRESSION ====== */
+#progression { position:fixed; top:0; left:0; height:3px; width:0; background:var(--titre); z-index:60; }
+
+/* ====== SOMMAIRE LATÉRAL ====== */
+nav { position:fixed; top:0; left:0; bottom:0; width:var(--nav); padding:30px 22px; background:var(--papier);
+      border-right:1px solid var(--filet); overflow-y:auto; z-index:50; transition:transform .35s; }
+.logo { font-family:'Barlow Condensed'; font-size:34px; letter-spacing:.1em; color:var(--titre); }
+.logo-sub { font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--gris); margin:4px 0 22px; line-height:1.6; }
+#filtre { width:100%; font:inherit; font-size:13px; padding:6px 2px; margin-bottom:10px; color:var(--encre);
+          background:transparent; border:none; border-bottom:1px solid var(--gris); outline:none; }
+#filtre:focus { border-bottom-color:var(--titre); }
+#filtre::placeholder { font-style:italic; color:var(--gris); }
+.chap { font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--gris); font-weight:600; margin:18px 0 6px; }
+nav a { display:flex; gap:10px; align-items:baseline; padding:5px 8px; font-size:14px; color:var(--encre);
+        text-decoration:none; border-left:2px solid transparent; transition:all .2s; }
+nav a span { font-family:'Barlow Condensed'; font-size:13px; color:var(--gris); min-width:20px; }
+nav a:hover { color:var(--titre); }
+nav a.actif { color:var(--titre); border-left-color:var(--titre); background:#fff; }
+nav a.cache { display:none; }
+.nav-pied { margin-top:28px; padding-top:16px; border-top:1px solid var(--filet); font-size:11.5px; color:var(--gris); line-height:1.9; }
+.nav-pied a { display:inline; padding:0; border:none; font-size:11.5px; color:var(--titre); }
+kbd { font:inherit; font-size:11px; background:#fff; border:1px solid var(--filet); padding:0 5px; }
+#burger { display:none; position:fixed; top:14px; left:14px; z-index:70; width:40px; height:40px; font-size:18px;
+          background:#fff; border:1px solid var(--filet); color:var(--encre); cursor:pointer; }
+
+/* ====== SECTIONS ====== */
+main { margin-left:var(--nav); }
+section { min-height:100vh; padding:70px 5vw 50px; display:flex; flex-direction:column; justify-content:center;
+          border-bottom:1px solid var(--filet); scroll-snap-align:start; }
+.apparait { opacity:0; transform:translateY(30px); transition:opacity .8s, transform .8s; }
+.visible .apparait { opacity:1; transform:none; }
+.visible .apparait + .apparait { transition-delay:.15s; }
+
+/* Accueil */
+.hero { display:grid; grid-template-columns:1fr 1fr; gap:5vw; align-items:center; }
+.hero h1 { font-family:'Barlow Condensed'; font-weight:300; font-size:clamp(70px,10vw,140px); line-height:.9; letter-spacing:.04em; color:var(--titre); }
+.hero .sous { font-size:14px; letter-spacing:.14em; text-transform:uppercase; margin:16px 0 34px; line-height:1.7; }
+blockquote { font-size:17px; line-height:1.65; font-weight:300; border-left:2px solid var(--titre); padding-left:20px; }
+cite { display:block; margin-top:12px; font-size:13px; color:var(--gris); }
+.hero img { width:100%; max-height:78vh; object-fit:contain; cursor:zoom-in; }
+.defiler { margin-top:40px; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--gris); animation:flotte 2s infinite; }
+@keyframes flotte { 50% { transform:translateY(6px); } }
+
+/* En-tête de section */
+.entete { display:flex; justify-content:space-between; align-items:flex-end; gap:20px; flex-wrap:wrap; margin-bottom:18px; }
+.num { font-family:'Barlow Condensed'; font-size:14px; letter-spacing:.16em; text-transform:uppercase; color:var(--titre); }
+h2 { font-family:'Barlow Condensed'; font-weight:300; font-size:clamp(30px,4vw,48px); line-height:1.05; text-transform:uppercase; letter-spacing:.04em; }
+.desc { font-size:14px; line-height:1.55; color:#5d5c58; max-width:640px; margin-top:6px; }
+.actions { display:flex; gap:6px; }
+.actions button, .actions a { font:inherit; font-size:11px; letter-spacing:.1em; text-transform:uppercase; text-decoration:none;
+  color:var(--gris); background:#fff; border:1px solid var(--filet); border-radius:999px; padding:6px 13px; cursor:pointer; transition:all .2s; }
+.actions button:hover, .actions a:hover { color:var(--titre); border-color:var(--titre); }
+
+/* Cadre des iframes */
+.cadre { position:relative; height:74vh; background:#fff; border:1px solid var(--filet); box-shadow:0 12px 40px rgba(0,0,0,.05); overflow:hidden; }
+.cadre:fullscreen { height:100vh; }
+.cadre iframe { width:100%; height:100%; border:0; opacity:0; transition:opacity .6s; }
+.cadre iframe.charge { opacity:1; }
+.chargement { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--gris); }
+.chargement::before { content:""; width:18px; height:18px; margin-right:10px; border:2px solid var(--filet);
+  border-top-color:var(--titre); border-radius:50%; animation:tourne 1s linear infinite; }
+@keyframes tourne { to { transform:rotate(360deg); } }
+
+/* Galerie d'images */
+.galerie { display:grid; grid-template-columns:2fr 1fr; gap:20px; height:74vh; }
+.galerie figure { display:flex; flex-direction:column; min-height:0; background:#fff; border:1px solid var(--filet); padding:14px; }
+.galerie img { flex:1; min-height:0; width:100%; object-fit:contain; cursor:zoom-in; transition:transform .3s; }
+.galerie img:hover { transform:scale(1.02); }
+figcaption { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--gris); margin-top:8px; }
+
+/* Agrandissement des images */
+#loupe { position:fixed; inset:0; z-index:100; display:none; align-items:center; justify-content:center;
+         padding:4vw; background:rgba(247,245,240,.97); cursor:zoom-out; }
+#loupe.ouvert { display:flex; }
+#loupe img { max-width:100%; max-height:100%; object-fit:contain; }
+
+/* Mobile */
+@media (max-width:900px) {
+  nav { transform:translateX(-100%); } nav.ouvert { transform:none; }
+  #burger { display:block; } main { margin-left:0; }
+  .hero, .galerie { grid-template-columns:1fr; } .galerie { height:auto; }
+  section { padding:70px 18px 40px; }
+}
+</style>
+</head>
+<body>
+
+<div id="progression"></div>
+<button id="burger">☰</button>
+
+<nav id="nav">
+  <div class="logo">#DAL</div>
+  <div class="logo-sub">Demain, architecture laboratory<br>2024 · Parricus Natura Regionalis</div>
+  <input id="filtre" type="text" placeholder="Filtrer les sections…">
+  <div id="liens">
+    <a href="#accueil" data-cible="accueil"><span>00</span>Accueil</a>
+  </div>
+  <div class="nav-pied">
+    <kbd>←</kbd> <kbd>→</kbd> section précédente / suivante<br>
+    Clic sur une image : agrandir<br>
+    <a id="retour-site" href="#">← Retour au site</a>
+  </div>
+</nav>
+
+<main id="contenu">
+  <section id="accueil">
+    <div class="hero">
+      <div>
+        <h1 class="apparait">#DAL</h1>
+        <p class="sous apparait"># : demain, architecture laboratory<br>2024 | Parricus Natura Regionalis</p>
+        <blockquote class="apparait">
+          Art. 1. — Le territoire de tout ou partie d'une ou de plusieurs communes peut être classé en « parc naturel régional »
+          lorsqu'il présente un intérêt particulier, par la qualité de son patrimoine naturel et culturel, pour la détente,
+          le repos des hommes et le tourisme, et qu'il importe de le protéger et de l'organiser.
+          <cite>Décret n° 67-158 du 1er mars 1967</cite>
+        </blockquote>
+        <div class="defiler">↓ Défiler</div>
+      </div>
+      <img id="img-hero" class="apparait" alt="Carte des parcs naturels régionaux">
+    </div>
+  </section>
+</main>
+
+<div id="loupe"><img alt=""></div>
+
+<script>
+// =====================================================
+// 1. ADRESSE DU DOSSIER DE LA PAGE SUR LE SITE (à vérifier !)
+// =====================================================
+const BASE = "https://singularitesdesterritoires.nantes.archi.fr/html/PNR/";
+
+// =====================================================
+// 2. LISTE DES SECTIONS : ajouter / retirer / réordonner ici
+//    type "iframe" : une page chargée dans un cadre
+//    type "images" : une ou plusieurs images
+//    desc : texte court (à rédiger avec l'équipe)
+// =====================================================
+const SECTIONS = [
+  { chapitre:"Introduction", titre:"Sommaire", type:"iframe",
+    src:"maps/pnr_2024/introdotte/introdotte.html", desc:"" },
+  { chapitre:"Constats", titre:"Constat 1", type:"iframe", src:"maps/pnr_2024/Constats/constat1.html", desc:"" },
+  { chapitre:"Constats", titre:"Constat 2", type:"iframe", src:"maps/pnr_2024/Constats/constat2.html", desc:"" },
+  { chapitre:"Constats", titre:"Constat 3", type:"iframe", src:"maps/pnr_2024/Constats/constat3.html", desc:"" },
+  { chapitre:"Modèle Riegl", titre:"Rieglelisation", type:"images", desc:"",
+    images:[ { src:"img/riegl PNR.PNG", legende:"Carte mentale Rieglelisation" },
+             { src:"img/PNR_usage.PNG", legende:"Détail : valeur d'usage" } ] },
+  { chapitre:"Modèle Riegl", titre:"Riegl v3", type:"iframe", src:"maps/pnr_2024/Riegl_v3/index.html", desc:"" },
+  { chapitre:"Modèle Riegl", titre:"Proposition de modèle des PNR", type:"iframe", src:"maps/pnr_2024/Riegl/index.html", desc:"" },
+  { chapitre:"Cartographies", titre:"Carte de la multiplicité", type:"iframe", src:"maps/Valeurs/index.html", desc:"" },
+  { chapitre:"Cartographies", titre:"Valeur d'ancienneté", type:"iframe", src:"maps/Anciennete/index.html", desc:"" },
+  { chapitre:"Objectifs des PNR", titre:"Objectif 1.2", type:"iframe", src:"maps/Objectif 1.2/index.html", desc:"" },
+  { chapitre:"Objectifs des PNR", titre:"Objectif 1.3", type:"iframe", src:"maps/Objectif 1.3/index.html", desc:"" }
+];
+
+// =====================================================
+// 3. CONSTRUCTION DE LA PAGE À PARTIR DE LA LISTE
+// =====================================================
+const url = chemin => /^https?:/.test(chemin) ? chemin : new URL(encodeURI(chemin), BASE).href;
+const main = document.getElementById("contenu");
+const liensNav = document.getElementById("liens");
+
+document.getElementById("img-hero").src = url("img/carte HIBA.png");
+document.getElementById("retour-site").href = url("../../index.html");
+
+let chapitrePrecedent = null;
+SECTIONS.forEach((s, i) => {
+  const id = "s" + (i + 1);
+  const n = String(i + 1).padStart(2, "0");
+
+  // Lien du sommaire
+  if (s.chapitre !== chapitrePrecedent) {
+    liensNav.insertAdjacentHTML("beforeend", `<div class="chap">${s.chapitre}</div>`);
+    chapitrePrecedent = s.chapitre;
+  }
+  liensNav.insertAdjacentHTML("beforeend", `<a href="#${id}" data-cible="${id}"><span>${n}</span>${s.titre}</a>`);
+
+  // Contenu de la section
+  let contenu, actions = "";
+  if (s.type === "images") {
+    contenu = `<div class="galerie apparait">${s.images.map(im => `
+      <figure><img src="${url(im.src)}" alt="${im.legende}"
+        onerror="this.alt='Image introuvable : vérifier BASE'"><figcaption>${im.legende}</figcaption></figure>`).join("")}</div>`;
+  } else {
+    contenu = `<div class="cadre apparait"><div class="chargement">Chargement</div>
+      <iframe data-src="${url(s.src)}" title="${s.titre}"></iframe></div>`;
+    actions = `<div class="actions"><button class="plein">Plein écran</button>
+      <a href="${url(s.src)}" target="_blank">Ouvrir ↗</a></div>`;
+  }
+  main.insertAdjacentHTML("beforeend", `
+    <section id="${id}">
+      <div class="entete apparait">
+        <div>
+          <div class="num">${n} · ${s.chapitre}</div>
+          <h2>${s.titre}</h2>
+          ${s.desc ? `<p class="desc">${s.desc}</p>` : ""}
+        </div>
+        ${actions}
+      </div>
+      ${contenu}
+    </section>`);
+});
+
+const sections = [...document.querySelectorAll("section")];
+const liens = [...document.querySelectorAll("nav a[data-cible]")];
+
+// =====================================================
+// 4. CHARGEMENT À LA DEMANDE + APPARITION AU DÉFILEMENT
+// =====================================================
+const chargeur = new IntersectionObserver(entrees => entrees.forEach(e => {
+  if (!e.isIntersecting) return;
+  const f = e.target.querySelector("iframe[data-src]");
+  if (!f) return;
+  f.onload = () => { f.classList.add("charge"); f.previousElementSibling?.remove(); };
+  f.src = f.dataset.src;
+  f.removeAttribute("data-src");
+}), { rootMargin: "400px 0px" });
+
+const revelateur = new IntersectionObserver(entrees => entrees.forEach(e => {
+  if (e.isIntersecting) e.target.classList.add("visible");
+}), { threshold: 0.12 });
+
+sections.forEach(s => { chargeur.observe(s); revelateur.observe(s); });
+
+// =====================================================
+// 5. SOMMAIRE QUI SUIT LA LECTURE + BARRE DE PROGRESSION
+// =====================================================
+let indexCourant = 0;
+function suivre() {
+  const h = document.documentElement;
+  document.getElementById("progression").style.width =
+    (h.scrollTop / (h.scrollHeight - h.clientHeight) * 100) + "%";
+  sections.forEach((s, i) => { if (s.getBoundingClientRect().top < innerHeight * 0.4) indexCourant = i; });
+  liens.forEach(a => a.classList.toggle("actif", a.dataset.cible === sections[indexCourant].id));
+}
+addEventListener("scroll", suivre, { passive: true });
+suivre();
+
+// =====================================================
+// 6. INTERACTIONS
+// =====================================================
+const nav = document.getElementById("nav");
+const loupe = document.getElementById("loupe");
+
+document.addEventListener("click", e => {
+  const bouton = e.target.closest(".plein");
+  if (bouton) bouton.closest("section").querySelector(".cadre").requestFullscreen?.();
+
+  const img = e.target.closest(".galerie img, .hero img");
+  if (img) { loupe.querySelector("img").src = img.src; loupe.classList.add("ouvert"); }
+
+  if (e.target.closest("nav a")) nav.classList.remove("ouvert");
+});
+loupe.addEventListener("click", () => loupe.classList.remove("ouvert"));
+document.getElementById("burger").addEventListener("click", () => nav.classList.toggle("ouvert"));
+
+// Filtre du sommaire
+const normaliser = t => t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+document.getElementById("filtre").addEventListener("input", function () {
+  const q = normaliser(this.value.trim());
+  liens.forEach(a => a.classList.toggle("cache", q && !normaliser(a.textContent).includes(q)));
+});
+
+// Clavier : ← → pour changer de section, Échap pour fermer
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT") return;
+  if (e.key === "Escape") { loupe.classList.remove("ouvert"); nav.classList.remove("ouvert"); }
+  if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+    const cible = sections[indexCourant + (e.key === "ArrowRight" ? 1 : -1)];
+    if (cible) cible.scrollIntoView({ behavior: "smooth" });
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Territoire habité — Diagramme interactif</title>
+<style>
+:root{color-scheme:light;--paper:#f5f3eb;--card:#fffdf7;--ink:#182d28;--muted:#435b53;--accent:#086352;--line:#879b90}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 "Segoe UI",system-ui,sans-serif}
+main{max-width:1440px;margin:auto;padding:clamp(16px,4vw,56px)}
+header{border-top:4px solid var(--ink);padding-top:16px}
+h1,h2,h3,p{margin:0}
+h1{font:normal clamp(2.8rem,7vw,6rem)/1 Georgia,serif;letter-spacing:-.065em;margin:10px 0 16px}
+h2{font:normal clamp(1.7rem,4vw,2.75rem)/1.1 Georgia,serif;margin-bottom:12px}
+h3{font-size:1rem;margin-bottom:6px}
+header p,footer,.hint,#position{color:var(--muted)}
+a{color:var(--accent);text-underline-offset:3px}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:3px solid #a94317;outline-offset:3px}
+.navigator{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:26px 0 8px}
+.navigator button{min-height:40px;padding:6px 13px;border:1px solid var(--line);border-radius:5px;background:var(--card)}
+.navigator button:disabled{opacity:.48;cursor:default}
+#position{margin-left:auto;font-variant-numeric:tabular-nums}
+.track{overflow-x:auto;padding:7px 4px 13px;scrollbar-color:var(--line) transparent}
+.flow{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(7,minmax(130px,1fr));gap:24px}
+.flow li{position:relative;display:flex}
+.flow li:not(:last-child)::after{content:"→";position:absolute;left:100%;width:24px;top:50%;transform:translateY(-50%);text-align:center;color:var(--muted);pointer-events:none}
+.stage{width:100%;min-height:126px;padding:12px 10px;display:flex;flex-direction:column;gap:7px;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:6px;line-height:1.24}
+.stage small{font-size:.78rem;color:var(--muted)}
+.stage:hover{border-color:var(--accent);background:#e4f0e9}
+.stage[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:white}
+.stage[aria-pressed=true] small{color:#e1f4eb}
+.hint{display:none;font-size:.87rem}
+.detail{margin-top:14px;padding:clamp(16px,3vw,32px);border-top:4px solid var(--accent);background:var(--card)}
+.detail>p{max-width:68ch}
+.topics{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:12px;margin-top:16px}
+.topics:empty{display:none}
+article{border:1px solid var(--line);border-radius:5px;padding:13px}
+ul{margin:8px 0 0;padding-left:20px}
+footer{margin-top:24px;font-size:.9rem}
+@media(max-width:1140px){.hint{display:block}}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <p>Singularités des territoires · ENSA Nantes</p>
+  <h1>Territoire habité</h1>
+  <p>Sélectionne une étape du diagramme pour en afficher le détail.</p>
+</header>
+
+<nav class="navigator" aria-label="Navigation entre les étapes">
+  <button id="prev" type="button">← Précédent</button>
+  <button id="next" type="button">Suivant →</button>
+  <output id="position" aria-label="Étape"></output>
+</nav>
+
+<p class="hint">Fais défiler le diagramme horizontalement pour voir les autres étapes.</p>
+
+<div class="track" aria-label="Diagramme horizontal du territoire habité">
+  <ol class="flow">
+    <li>
+      <button class="stage" type="button" data-id="territoire" aria-controls="details" aria-pressed="true">
+        <strong>Territoire</strong><small>City by Data et City by People</small>
+      </button>
+    </li>
+    <li>
+      <button class="stage" type="button" data-id="plateforme" aria-controls="details" aria-pressed="false">
+        <strong>Plateforme contributive</strong><small>Experts, citoyens, collectivités</small>
+      </button>
+    </li>
+    <li>
+      <button class="stage" type="button" data-id="systeme" aria-controls="details" aria-pressed="false">
+        <strong>Système expert</strong><small>Organiser les données</small>
+      </button>
+    </li>
+    <li>
+      <button class="stage" type="button" data-id="modele" aria-controls="details" aria-pressed="false">
+        <strong>Modèle théorique</strong><small>Croiser, classer, visualiser</small>
+      </button>
+    </li>
+    <li>
+      <button class="stage" type="button" data-id="technologie" aria-controls="details" aria-pressed="false">
+        <strong>Technologie</strong><small>Traitement algorithmique</small>
+      </button>
+    </li>
+    <li>
+      <button class="stage" type="button" data-id="citoyennete" aria-controls="details" aria-pressed="false">
+        <strong>Citoyenneté</strong><small>Délibérer et agir</small>
+      </button>
+    </li>
+    <li>
+      <button class="stage" type="button" data-id="habite" aria-controls="details" aria-pressed="false">
+        <strong>Territoire habité</strong><small>Intelligible et co-construit</small>
+      </button>
+    </li>
+  </ol>
+</div>
+
+<section class="detail" id="details" aria-labelledby="title">
+  <h2 id="title" aria-live="polite">Territoire</h2>
+  <p id="description"></p>
+  <ul id="examples" hidden></ul>
+  <div class="topics" id="topics"></div>
+</section>
+
+<footer>
+  Adaptation du schéma de la vidéo
+  <a href="https://singularitesdesterritoires.nantes.archi.fr/html/presentation.html">« Territoire habité »</a>.
+</footer>
+</main>
+
+<script>
+const details = {
+  territoire: [
+    'Territoire',
+    'Deux approches se rencontrent pour comprendre le territoire. City by Data s’appuie sur les données. City by People met les habitants et les usages au premier plan.'
+  ],
+  cbd: [
+    'City by Data',
+    'Décrire le territoire à partir de données géographiques, de bases publiques et de traces produites par les usages.'
+  ],
+  cbp: [
+    'City by People',
+    'Comprendre le territoire à partir de celles et ceux qui l’habitent et de leur contribution à sa connaissance.'
+  ],
+  plateforme: [
+    'Plateforme contributive',
+    'La plateforme relie experts, citoyens et collectivités. Son interface permet de contribuer à la compréhension du territoire et de partager ce qui en ressort.'
+  ],
+  experts: [
+    'Intégrer · Experts',
+    'Les experts apportent et intègrent leurs connaissances dans la plateforme.'
+  ],
+  citoyens: [
+    'Partager et contribuer · Citoyens',
+    'L’interface permet aux citoyens de comprendre le territoire et de participer à sa description.'
+  ],
+  collectivites: [
+    'Visualiser · Collectivités',
+    'Les collectivités consultent les représentations produites à partir des données et contributions.'
+  ],
+  systeme: [
+    'Système expert',
+    'Le système organise les données en arborescences et en tableaux pour permettre leur traitement.'
+  ],
+  statiques: [
+    'Données statiques',
+    'Ces ressources fournissent des descriptions du territoire à un état donné.',
+    ['Bases de données géographiques, open data, Wikidata, OpenStreetMap et données partenaires.']
+  ],
+  dynamiques: [
+    'Données dynamiques',
+    'Ces données évoluent au fil des déplacements, des interactions et des mesures.',
+    ['Traces GPS, réseaux sociaux, capteurs connectés et applications mobiles.']
+  ],
+  modele: [
+    'Modèle théorique abstrait',
+    'Le modèle structure l’analyse autour de trois opérations complémentaires.',
+    ['Croiser les sources, classer les éléments et visualiser les résultats.']
+  ],
+  croiser: [
+    'Croiser',
+    'Mettre en relation plusieurs sources ou couches pour repérer des liens.',
+    ['Stratigraphie, web sémantique, relations spatiales.']
+  ],
+  classer: [
+    'Classer',
+    'Regrouper les éléments selon leurs propriétés pour faciliter leur comparaison et leur traitement.',
+    ['Catégories, mots-clés, formes, métadonnées, indicateurs.']
+  ],
+  visualiser: [
+    'Visualiser',
+    'Rendre l’analyse lisible et permettre d’explorer différents états du territoire.',
+    ['Cartographies, tableaux de bord, simulations, représentations 3D, discussions et conférences.']
+  ],
+  technologie: [
+    'Technologie · Traitement algorithmique',
+    'Les outils techniques servent à interroger les sources, préparer les données et produire des représentations.',
+    [
+      'RDF et SPARQL pour les données liées, API et bases relationnelles pour les traitements.',
+      'JavaScript, Python, QGIS, Mapbox GL JS et D3.js pour l’analyse et la représentation.'
+    ]
+  ],
+  citoyennete: [
+    'Citoyenneté',
+    'Le schéma relie la lecture des singularités à la délibération, et l’exploration des potentialités à l’action.'
+  ],
+  singularites: [
+    'Singularités · Délibérer',
+    'Les singularités désignent les formes et les dynamiques propres au territoire. Les rendre lisibles permet d’en débattre avec transparence.'
+  ],
+  potentialites: [
+    'Potentialités · Agir',
+    'Les potentialités désignent les évolutions et les scénarios possibles. Ils permettent d’envisager des actions, puis de les évaluer et de les réajuster.'
+  ],
+  habite: [
+    'Territoire habité',
+    'Le schéma aboutit à un territoire intelligible et co-construit, où la connaissance partagée alimente la délibération et l’action.'
+  ]
+};
+
+const topicsByStage = {
+  territoire: ['cbd', 'cbp'],
+  plateforme: ['experts', 'citoyens', 'collectivites'],
+  systeme: ['statiques', 'dynamiques'],
+  modele: ['croiser', 'classer', 'visualiser'],
+  technologie: [],
+  citoyennete: ['singularites', 'potentialites'],
+  habite: []
+};
+
+const buttons = [...document.querySelectorAll('.stage')];
+const track = document.querySelector('.track');
+const title = document.querySelector('#title');
+const description = document.querySelector('#description');
+const examples = document.querySelector('#examples');
+const topics = document.querySelector('#topics');
+const prev = document.querySelector('#prev');
+const next = document.querySelector('#next');
+const position = document.querySelector('#position');
+let active = 0;
+
+function element(tag, text) {
+  const node = document.createElement(tag);
+  node.textContent = text;
+  return node;
+}
+
+function show(index, reveal = true) {
+  active = index;
+  const button = buttons[index];
+  const id = button.dataset.id;
+  const [label, text, items = []] = details[id];
+
+  title.textContent = label;
+  description.textContent = text;
+  examples.replaceChildren(...items.map(item => element('li', item)));
+  examples.hidden = items.length === 0;
+
+  topics.replaceChildren(...topicsByStage[id].map(key => {
+    const [name, summary, examples = []] = details[key];
+    const article = document.createElement('article');
+    article.append(element('h3', name), element('p', summary));
+    if (examples.length) {
+      const list = document.createElement('ul');
+      list.append(...examples.map(example => element('li', example)));
+      article.append(list);
+    }
+    return article;
+  }));
+
+  buttons.forEach((node, i) => node.setAttribute('aria-pressed', String(i === index)));
+  prev.disabled = index === 0;
+  next.disabled = index === buttons.length - 1;
+  position.textContent = 'Étape ' + (index + 1) + ' sur ' + buttons.length;
+
+  if (reveal) {
+    const frame = track.getBoundingClientRect();
+    const rect = button.getBoundingClientRect();
+    if (rect.left < frame.left || rect.right > frame.right) {
+      track.scrollLeft += (rect.left + rect.right - frame.left - frame.right) / 2;
+    }
+  }
+}
+
+buttons.forEach((button, index) => {
+  button.addEventListener('click', () => show(index));
+  button.addEventListener('keydown', event => {
+    const step = {'ArrowLeft': -1, 'ArrowRight': 1}[event.key];
+    if (!step) return;
+    event.preventDefault();
+    const target = Math.max(0, Math.min(buttons.length - 1, index + step));
+    buttons[target].focus({preventScroll: true});
+    show(target);
+  });
+});
+
+prev.addEventListener('click', () => show(active - 1));
+next.addEventListener('click', () => show(active + 1));
+show(0, false);
+</script>
+</body>
+</html>
