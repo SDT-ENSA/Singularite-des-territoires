@@ -18,3 +18,5 @@ Page de test des interfaces
 ### Ajouter un test
 
 Créez un fichier HTML portant un nom unique, puis ajoutez une ligne à ce tableau avec son code et son adresse GitHub Pages. Pour actualiser un test existant, modifiez son fichier sur la branche main en conservant son nom.
+
+<!-- Feuille de route interface -->
