@@ -1,0 +1,30 @@
+import re, subprocess, os
+
+OUT = '/mnt/user-data/outputs/atlas-sites.html'
+with open(OUT, encoding='utf-8') as f:
+    html = f.read()
+
+# Le fichier contient déjà l’extinction progressive des lueurs (GLOW / glowTo) : on la conserve.
+# Il manque le cercle de survol à l’échelle du territoire : son rayon suit le zoom du globe.
+reps = [
+    ("el.style.setProperty('--gl', GLOW.k.toFixed(3));",
+     "el.style.setProperty('--gl', GLOW.k.toFixed(3));\n"
+     "      const ring = el.querySelector('circle'), pxPerKm = h / (2 * g.distance() * Math.tan(FOV * PI / 360)) / 6371;\n"
+     "      const rr = Math.max(8, TERR[i].radiusKm * pxPerKm), len = (2 * PI * rr).toFixed(1);\n"
+     "      ring.setAttribute('r', rr.toFixed(1)); ring.style.strokeDasharray = len; ring.style.strokeDashoffset = len;"),
+]
+
+for old, new in reps:
+    n = html.count(old)
+    assert n == 1, f'occurrences={n} for: {old[:70]!r}'
+    html = html.replace(old, new, 1)
+
+with open(OUT, 'w', encoding='utf-8') as f:
+    f.write(html)
+
+m = re.findall(r'<script>\n(.*?)</script>', html, re.S)
+tmp = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'check8.js')
+with open(tmp, 'w', encoding='utf-8') as f:
+    f.write(m[-1] if m else '')
+r = subprocess.run(['node', '--check', tmp], capture_output=True, text=True)
+print('node --check:', 'OK' if r.returncode == 0 else r.stderr[:800])
