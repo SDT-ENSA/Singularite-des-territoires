@@ -1,47 +1,19 @@
 (() => {
-  const data = window.OBSERVATORY_DATA;
-  let activeIndicator = 0, activeYear = data.years.length - 1, night = true, playing = false, timer, map, districtLayer, mapMode = 'simulation';
-  const $ = (s) => document.querySelector(s);
-  const fmt = (number) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 }).format(number);
-
-  function renderControls() {
-    $('#indicatorList').innerHTML = data.indicators.map((item, index) => `<label class="indicator ${index === activeIndicator ? 'active' : ''}"><input type="radio" name="indicator" value="${index}" ${index === activeIndicator ? 'checked' : ''}/><span class="radio"></span><span>${item.label}</span></label>`).join('');
-    $('#yearButtons').innerHTML = data.years.map((year, index) => `<button class="${index === activeYear ? 'selected' : ''}" data-year="${index}">${year}</button>`).join('');
-    document.querySelectorAll('input[name=indicator]').forEach(el => el.addEventListener('change', e => { activeIndicator = Number(e.target.value); update(); }));
-    document.querySelectorAll('[data-year]').forEach(el => el.addEventListener('click', () => { activeYear = Number(el.dataset.year); update(); }));
+  const data = window.OBSERVATORY_DATA, $ = s => document.querySelector(s); let activeIndicator = 0, map, tourTimer;
+  const fmt = n => new Intl.NumberFormat('fr-FR').format(n), colorFor = v => v > 23 ? '#d9c57c' : v > 19 ? '#8ebd84' : v > 16 ? '#4f926c' : '#265c47';
+  const zoneCenters = [[-2.26,47.39],[-2.20,47.42],[-2.13,47.40],[-2.10,47.35],[-2.18,47.33],[-2.25,47.34],[-2.07,47.32],[-2.15,47.29]];
+  const fields = zoneCenters.map(([lng,lat], i) => { const s=.024+(i%3)*.006; return {type:'Feature',properties:{name:data.districts[i],index:i},geometry:{type:'Polygon',coordinates:[[[lng-s,lat-s*.55],[lng+s,lat-s*.55],[lng+s*1.2,lat+s*.35],[lng-s*.55,lat+s*.8],[lng-s,lat-s*.55]]]}}; });
+  const waterways={type:'FeatureCollection',features:[{type:'Feature',geometry:{type:'LineString',coordinates:[[-2.32,47.43],[-2.27,47.40],[-2.21,47.41],[-2.16,47.37],[-2.10,47.38],[-2.04,47.34]]}},{type:'Feature',geometry:{type:'LineString',coordinates:[[-2.29,47.33],[-2.23,47.36],[-2.18,47.35],[-2.13,47.31],[-2.08,47.30]]}}]};
+  const officialCodes=['44013','44050','44052','44103','44129','44137','44176','44210'];
+  async function loadOfficialZones(){
+    try { const features=await Promise.all(officialCodes.map(async(code)=>{const response=await fetch(`https://geo.api.gouv.fr/communes/${code}?fields=nom,code,contour&format=geojson&geometry=contour`);const feature=await response.json();return {...feature,properties:{...feature.properties,index:officialCodes.indexOf(code)}};})); map.getSource('zones').setData({type:'FeatureCollection',features}); $('#mapStatus').textContent='Contours communaux officiels chargés'; }
+    catch { $('#mapStatus').textContent='Contours indicatifs affichés — source officielle indisponible'; }
   }
-  const districtLocations = [[52.392,4.84],[52.385,4.858],[52.377,4.874],[52.394,4.881],[52.367,4.882],[52.354,4.869],[52.345,4.89],[52.397,4.906],[52.381,4.91],[52.367,4.928],[52.389,4.932],[52.376,4.951],[52.356,4.937],[52.346,4.92],[52.337,4.9],[52.358,4.966],[52.373,4.975],[52.392,4.964],[52.403,4.944],[52.414,4.918],[52.408,4.888],[52.421,4.87],[52.43,4.905],[52.412,4.942],[52.388,4.99]];
-  const colorFor = value => value > 23 ? '#75e0cc' : value > 19 ? '#a997f9' : value > 16 ? '#7560d1' : '#41376f';
-  function districtValue(i) { return data.indicators[i % data.indicators.length].values[activeYear] || 0; }
-  function initMap() {
-    if (!window.L) return renderFallbackDistricts();
-    map = L.map('mapCanvas', { zoomControl: false, attributionControl: true, minZoom: 10, maxZoom: 16, scrollWheelZoom: true }).setView([52.372, 4.9], 12);
-    L.control.zoom({ position: 'bottomright' }).addTo(map);
-    const tileUrl = data.mapboxToken ? `https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/512/{z}/{x}/{y}?access_token=${data.mapboxToken}` : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-    L.tileLayer(tileUrl, { subdomains: 'abcd', maxZoom: 20, attribution: data.mapboxToken ? '© Mapbox © OpenStreetMap' : '© OpenStreetMap © CARTO' }).addTo(map);
-    map.attributionControl.setPrefix(''); renderDistricts();
-  }
-  function renderFallbackDistricts() { $('#districts').innerHTML = data.districts.map((name, i) => `<button class="district d${i}" style="--v:${districtValue(i)}" title="${name}"><span>${name}</span></button>`).join(''); }
-  function renderDistricts() {
-    if (!map) return renderFallbackDistricts();
-    if (districtLayer) districtLayer.remove(); districtLayer = L.layerGroup().addTo(map);
-    data.districts.forEach((name, i) => { const value = districtValue(i), radius = mapMode === 'simulation' ? 700 + value * 32 : 540; const circle = L.circle(districtLocations[i], { radius, color: '#d8d0ff', weight: 1, fillColor: colorFor(value), fillOpacity: mapMode === 'simulation' ? .58 : .42 }).addTo(districtLayer); circle.bindTooltip(`<strong>${name}</strong><br>${value} propriétés requises`, { direction:'top', offset:[0,-8], opacity:.96 }); circle.on('click', () => { $('#mapStatus').textContent = `${name} · ${value} propriétés requises`; map.flyTo(districtLocations[i], 13, { duration:.7 }); }); });
-  }
-  function update() {
-    renderControls(); renderDistricts();
-    const item = data.indicators[activeIndicator];
-    $('#mapIndicatorName').textContent = item.label;
-    $('#mapYear').textContent = `${fmt(item.values[activeYear])} ${item.unit}`;
-    $('#mapStatus').textContent = `${item.label} · données du référentiel chargées`;
-  }
-  $('#playButton').addEventListener('click', () => {
-    playing = !playing; $('#playButton').classList.toggle('running', playing); $('#playButton span').textContent = playing ? 'Pause' : 'Lire les années';
-    clearInterval(timer); if (playing) timer = setInterval(() => { activeYear = (activeYear + 1) % data.years.length; update(); }, 1100);
-  });
-  $('#nightButton').addEventListener('click', () => { night = !night; $('#mapCanvas').classList.toggle('day', !night); $('#nightButton').textContent = night ? '☾' : '☀'; });
-  $('#resetButton').addEventListener('click', () => { activeIndicator = 0; activeYear = data.years.length - 1; if(map) map.flyTo([52.372,4.9],12,{duration:.6}); update(); });
-  $('#tourButton').addEventListener('click', () => { let i = 0; const tour = setInterval(() => { const point=districtLocations[i++ % districtLocations.length]; if(map) map.flyTo(point, 13, {duration:.55}); if(i > districtLocations.length) { clearInterval(tour); if(map) map.flyTo([52.372,4.9],12,{duration:.6}); } }, 700); });
-  $('#fullButton').addEventListener('click', () => document.documentElement.requestFullscreen?.());
-  document.querySelectorAll('[data-mode]').forEach(button => button.addEventListener('click', () => { document.querySelectorAll('[data-mode]').forEach(b => b.classList.remove('selected')); button.classList.add('selected'); mapMode=button.dataset.mode; $('#mapCanvas').classList.toggle('flat', mapMode === 'map'); renderDistricts(); }));
-  $('#districtCount').textContent = data.city.districtCount; initMap(); update();
+  const valueFor=i=>data.indicators[(i+activeIndicator)%data.indicators.length].values[0];
+  function renderControls(){ $('#indicatorList').innerHTML=data.indicators.map((item,i)=>`<label class="indicator ${i===activeIndicator?'active':''}"><input type="radio" name="indicator" value="${i}" ${i===activeIndicator?'checked':''}/><span class="radio"></span><span>${item.label}</span><b>${item.values[0]}</b></label>`).join(''); document.querySelectorAll('input[name="indicator"]').forEach(el=>el.addEventListener('change',e=>{activeIndicator=Number(e.target.value);update();})); }
+  function styleMap(){ const palette=data.districts.map((_,i)=>colorFor(valueFor(i))); map.setPaintProperty('heritage-zones','fill-extrusion-color',['match',['get','index'],...palette.flatMap((c,i)=>[i,c]),'#4f926c']); map.setPaintProperty('heritage-zones','fill-extrusion-height',['match',['get','index'],...data.districts.flatMap((_,i)=>[i,260+valueFor(i)*36]),300]); }
+  function initMap(){ if(!window.maplibregl){$('#mapStatus').textContent='Carte 3D indisponible hors connexion';return;} map=new maplibregl.Map({container:'mapCanvas',center:data.map.center,zoom:data.map.zoom,pitch:data.map.pitch,bearing:data.map.bearing,antialias:true,style:{version:8,sources:{basemap:{type:'raster',tiles:['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],tileSize:256,attribution:'© OpenStreetMap'},zones:{type:'geojson',data:{type:'FeatureCollection',features:fields}},water:{type:'geojson',data:waterways}},layers:[{id:'base',type:'raster',source:'basemap',paint:{'raster-saturation':-0.72,'raster-brightness-min':.20,'raster-brightness-max':.68}},{id:'waterways',type:'line',source:'water',paint:{'line-color':'#76b7b1','line-width':3,'line-opacity':.85}},{id:'heritage-zones',type:'fill-extrusion',source:'zones',paint:{'fill-extrusion-color':'#4f926c','fill-extrusion-height':320,'fill-extrusion-base':0,'fill-extrusion-opacity':.88}},{id:'zone-outline',type:'line',source:'zones',paint:{'line-color':'#e8ddb0','line-width':1.2,'line-opacity':.72}}]}}); map.addControl(new maplibregl.NavigationControl({visualizePitch:true}),'bottom-right'); map.on('load',()=>{styleMap();loadOfficialZones();map.on('click','heritage-zones',e=>{const p=e.features[0].properties,i=Number(p.index),v=valueFor(i);$('#mapStatus').textContent=`${p.name} · ${v} propriétés requises`;map.flyTo({center:e.lngLat,zoom:12.2,duration:850});});map.on('mouseenter','heritage-zones',()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave','heritage-zones',()=>map.getCanvas().style.cursor='');}); }
+  function update(){renderControls();const item=data.indicators[activeIndicator];$('#mapIndicatorName').textContent=item.label;$('#mapYear').textContent=`${fmt(item.values[0])} ${item.unit}`;$('#mapStatus').textContent=`${item.label} · relief mis à jour`;if(map&&map.isStyleLoaded())styleMap();}
+  function reset(){clearInterval(tourTimer);map?.flyTo({center:data.map.center,zoom:data.map.zoom,pitch:data.map.pitch,bearing:data.map.bearing,duration:900});}
+  $('#resetButton').addEventListener('click',reset);$('#tourButton').addEventListener('click',()=>{clearInterval(tourTimer);let i=0;tourTimer=setInterval(()=>{map?.flyTo({center:zoneCenters[i%zoneCenters.length],zoom:12,pitch:64,bearing:-35+(i%3)*22,duration:900});i++;if(i>zoneCenters.length){clearInterval(tourTimer);setTimeout(reset,1000);}},1300);});$('#fullButton').addEventListener('click',()=>document.documentElement.requestFullscreen?.());document.querySelectorAll('[data-mode]').forEach(button=>button.addEventListener('click',()=>{document.querySelectorAll('[data-mode]').forEach(b=>b.classList.remove('selected'));button.classList.add('selected');const is3d=button.dataset.mode==='3d';map?.easeTo({pitch:is3d?data.map.pitch:0,bearing:is3d?data.map.bearing:0,duration:700});}));$('#completion').textContent=data.city.districtCount;$('#pending').textContent=data.indicators.length;renderControls();initMap();
 })();
