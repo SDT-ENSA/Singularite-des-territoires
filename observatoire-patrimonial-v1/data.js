@@ -1,7 +1,6 @@
-/* Source unique des contenus — vous pourrez remplacer ces valeurs par vos propres données. */
+/* Source unique des contenus — remplacez ces données par vos observations. */
 window.OBSERVATORY_DATA = {
-  city: { name: 'Observatoire patrimonial', country: 'Référentiel scientifique', period: 'Révision 1', districtCount: 119 },
-  mapboxToken: '', /* Ajoutez ici un jeton Mapbox public pour remplacer le fond OSM. */
+  city: { name: 'Observatoire patrimonial de Brière', country: 'Parc naturel régional de Brière', period: 'Version 1', districtCount: 119 },
   years: ['Référentiel'],
   indicators: [
     { id: 'novelty', label: 'Nouveauté', unit: 'propriétés requises', values: [21] },
@@ -11,5 +10,6 @@ window.OBSERVATORY_DATA = {
     { id: 'memory', label: 'Mémoire', unit: 'propriétés requises', values: [16] },
     { id: 'age', label: 'Ancienneté', unit: 'propriétés requises', values: [18] }
   ],
-  districts: ['Nouveauté','Usage','Art','Histoire','Mémoire','Ancienneté']
+  districts: ['Besné', 'Crossac', 'Donges', 'Montoir-de-Bretagne', 'Pontchâteau', 'Prinquiau', 'Saint-Malo-de-Guersac', 'Trignac'],
+  map: { center: [-2.18, 47.36], zoom: 10.8, bearing: -22, pitch: 58 }
 };
