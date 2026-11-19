@@ -15,6 +15,7 @@ Page de test des interfaces
 | Territoire habité — Vidéo diagramme | [Code de vidéo-diagramme](./video-diagramme.html) | [Ouvrir Vidéo diagramme](https://sdt-ensa.github.io/Singularite-des-territoires/video-diagramme.html) |
 | Territoire habité — Diagramme vidéo | [Code de diagramme-vidéo](./diagramme-vid%C3%A9o.html) | [Ouvrir Diagramme vidéo](https://sdt-ensa.github.io/Singularite-des-territoires/diagramme-vid%C3%A9o.html) |
 | Index — Atlas de la Brière | [Code de l’atlas](./index-atlas-briere.html) | [Ouvrir l’atlas](https://sdt-ensa.github.io/Singularite-des-territoires/index-atlas-briere.html) |
+| Observatoire patrimonial — Version autonome | [Code HTML](./index-observatoire-patrimonial.html) | [Ouvrir l’observatoire](https://sdt-ensa.github.io/Singularite-des-territoires/index-observatoire-patrimonial.html) |
 
 ### Ajouter un test
 
