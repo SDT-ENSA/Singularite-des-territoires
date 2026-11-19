@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f5ef">
+  <meta name="description" content="Atlas interactif des terrains d’étude du studio Singularités des territoires autour de la Brière.">
+  <title>Atlas de la Brière — Singularités des territoires</title>
+  <link rel="icon" href="media/atlas.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="content.js"></script>
+  <script defer src="map-data.js"></script>
+  <script defer src="map.js"></script>
+  <script defer src="views.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Aller au contenu</a>
+  <header class="site-header">
+    <div class="site-bar">
+      <a class="brand" href="#atlas" aria-label="Singularités des territoires, accueil de l’atlas">
+        <img src="media/atlas.svg" alt="" width="42" height="42">
+        <span>Singularités<br>des territoires</span>
+      </a>
+      <nav class="primary-nav" aria-label="Navigation principale">
+        <a href="#atlas" data-nav="atlas" aria-current="page">Atlas</a>
+        <a href="#comparer" data-nav="comparer">Comparer</a>
+        <a href="#archives" data-nav="archives">Archives</a>
+        <a href="#studio" data-nav="studio">Le studio</a>
+      </nav>
+      <div class="header-actions">
+        <button class="button search-launch" type="button" data-action="search" aria-label="Rechercher dans l’atlas" aria-keyshortcuts="Control+K /"><span data-icon="search"></span><span class="desktop-label">Rechercher</span><kbd>/</kbd></button>
+        <button class="button notebook-launch" type="button" data-action="notebook" aria-label="Ouvrir le carnet"><span data-icon="bookmark"></span><span class="desktop-label">Carnet</span><span id="notebook-count" class="number" hidden></span></button>
+      </div>
+    </div>
+  </header>
+  <main id="main" tabindex="-1"></main>
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <span>Singularités des territoires <span class="footer-dot">·</span> Projet S7</span>
+      <div><a href="#studio">Sources et méthode</a><a href="https://singularitesdesterritoires.nantes.archi.fr/html/PNR/2026/index.html" target="_blank" rel="noopener">Site de référence</a></div>
+    </div>
+  </footer>
+  <dialog id="overlay" class="overlay" aria-labelledby="dialog-title"></dialog>
+  <p id="notification" class="notification" role="status"></p>
+  <noscript><p class="shell">Activez JavaScript pour utiliser la carte interactive et consulter les terrains d’étude.</p></noscript>
+</body>
+</html>
