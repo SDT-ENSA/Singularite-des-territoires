@@ -1,48 +1,93 @@
 <!doctype html>
 <html lang="fr">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f6f5ef">
-  <meta name="description" content="Atlas interactif des terrains d’étude du studio Singularités des territoires autour de la Brière.">
-  <title>Atlas de la Brière — Singularités des territoires</title>
-  <link rel="icon" href="media/atlas.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css">
-  <script defer src="content.js"></script>
-  <script defer src="map-data.js"></script>
-  <script defer src="map.js"></script>
-  <script defer src="views.js"></script>
-  <script defer src="app.js"></script>
-</head>
-<body>
-  <a class="skip-link" href="#main">Aller au contenu</a>
-  <header class="site-header">
-    <div class="site-bar">
-      <a class="brand" href="#atlas" aria-label="Singularités des territoires, accueil de l’atlas">
-        <img src="media/atlas.svg" alt="" width="42" height="42">
-        <span>Singularités<br>des territoires</span>
-      </a>
-      <nav class="primary-nav" aria-label="Navigation principale">
-        <a href="#atlas" data-nav="atlas" aria-current="page">Atlas</a>
-        <a href="#comparer" data-nav="comparer">Comparer</a>
-        <a href="#archives" data-nav="archives">Archives</a>
-        <a href="#studio" data-nav="studio">Le studio</a>
-      </nav>
-      <div class="header-actions">
-        <button class="button search-launch" type="button" data-action="search" aria-label="Rechercher dans l’atlas" aria-keyshortcuts="Control+K /"><span data-icon="search"></span><span class="desktop-label">Rechercher</span><kbd>/</kbd></button>
-        <button class="button notebook-launch" type="button" data-action="notebook" aria-label="Ouvrir le carnet"><span data-icon="bookmark"></span><span class="desktop-label">Carnet</span><span id="notebook-count" class="number" hidden></span></button>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0d1020" />
+    <title>Observatoire patrimonial</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <section class="language-gate" id="languageGate" aria-labelledby="languageTitle">
+      <div class="language-card">
+        <div class="language-logo"><span class="brand-mark"><i></i><i></i><i></i></span></div>
+        <p class="eyebrow">OBSERVATOIRE URBAIN</p>
+        <h2 id="languageTitle">Choisissez votre langue</h2>
+        <p class="language-intro">Vous pourrez la modifier à tout moment dans les réglages.</p>
+        <div class="language-grid" id="languageGrid"></div>
+        <button class="continue" id="languageContinue" disabled>Continuer</button>
       </div>
-    </div>
-  </header>
-  <main id="main" tabindex="-1"></main>
-  <footer class="site-footer">
-    <div class="footer-inner">
-      <span>Singularités des territoires <span class="footer-dot">·</span> Projet S7</span>
-      <div><a href="#studio">Sources et méthode</a><a href="https://singularitesdesterritoires.nantes.archi.fr/html/PNR/2026/index.html" target="_blank" rel="noopener">Site de référence</a></div>
-    </div>
-  </footer>
-  <dialog id="overlay" class="overlay" aria-labelledby="dialog-title"></dialog>
-  <p id="notification" class="notification" role="status"></p>
-  <noscript><p class="shell">Activez JavaScript pour utiliser la carte interactive et consulter les terrains d’étude.</p></noscript>
-</body>
+    </section>
+    <aside class="rail" aria-label="Navigation principale">
+      <a class="brand" href="#"><span class="brand-mark"><i></i><i></i><i></i></span><span>observatoire<br />urbain</span></a>
+      <nav class="main-nav">
+        <a href="#accueil"><span class="icon">⌂</span><span>Accueil</span></a>
+        <a href="#catalogue"><span class="icon">⊞</span><span>Catalogue</span></a>
+        <a class="active" href="#villes"><span class="icon">▥</span><span>Villes</span></a>
+        <a href="#comparaison"><span class="icon">♜</span><span>Comparaison</span></a>
+      </nav>
+      <button class="settings" id="languageSettings" aria-label="Choisir la langue" title="Choisir la langue">◎</button>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div class="crumb"><a href="#villes">Observatoires</a><span>/</span><span>Patrimoine</span></div>
+        <button class="ghost city-switch">Voir le référentiel <span>⌄</span></button>
+        <button class="dots" aria-label="Plus d’options">•••</button>
+      </header>
+
+      <section class="city-header">
+        <div class="city-copy">
+          <p class="eyebrow">Référentiel actif <span class="live-dot"></span></p>
+          <h1>Observation patrimoniale</h1>
+          <div class="period">▣ &nbsp; Version du référentiel <strong>Révision 1</strong></div>
+        </div>
+        <dl class="summary">
+          <div><dt id="calculated">6<small>/6</small></dt><dd>valeurs</dd></div>
+          <div><dt id="completion">119</dt><dd>propriétés requises</dd></div>
+          <div><dt id="pending">6</dt><dd>axes d’observation</dd></div>
+        </dl>
+      </section>
+
+      <nav class="city-nav" aria-label="Sections de la ville">
+        <a href="#dashboard">Tableau de bord</a>
+        <a class="selected" href="#map">Carte patrimoniale <b>119</b></a>
+        <a href="#report">Rapport</a>
+        <a href="#program">Référentiel <b>6</b></a>
+        <a href="#variables">Propriétés requises <b>119</b></a>
+        <a href="#data">Saisie d’observations</a>
+      </nav>
+
+      <section class="workspace" id="map">
+        <aside class="controls">
+          <div class="controls-heading"><p>RÉFÉRENTIEL · <span id="districtCount">119</span> PROPRIÉTÉS</p><h2>Choisir une valeur</h2></div>
+          <div id="indicatorList" class="indicator-list"></div>
+          <div class="legend"><span>Faible</span><div class="gradient"></div><span>Élevé</span></div>
+          <p class="source">Volume II · Tableau maître des propriétés patrimoniales requises. Modifiez <code>data.js</code> pour intégrer vos observations.</p>
+        </aside>
+
+        <div class="map-stage">
+          <div class="map-toolbar">
+            <button id="playButton" class="play">▶ <span>Lire les années</span></button>
+            <div id="yearButtons" class="years"></div>
+            <div class="view-toggle" aria-label="Mode d’affichage"><button class="selected" data-mode="simulation">Simulation</button><button data-mode="map">Carte</button></div>
+            <div class="utility"><button id="nightButton" title="Changer l’ambiance">☾</button><button id="resetButton" title="Réinitialiser">⟲</button><button id="tourButton" title="Tour automatique">◎</button><button id="fullButton" title="Plein écran">⛶</button></div>
+          </div>
+          <div class="map-canvas" id="mapCanvas" aria-label="Carte patrimoniale interactive">
+            <div class="water-label water-label-one">IJ</div><div class="water-label water-label-two">Amstel</div>
+            <div class="districts" id="districts"></div>
+            <div class="map-title"><span>VALEUR SÉLECTIONNÉE</span><strong id="mapIndicatorName">Nouveauté</strong><em id="mapYear">21 propriétés requises</em></div>
+            <div class="compass">N</div><div class="scale">— 2 km</div>
+            <div class="map-status"><span class="live-dot"></span><span id="mapStatus">Données actualisées</span></div>
+          </div>
+          <footer class="map-footer">Référentiel : Théorie générale de l’observation patrimoniale · Volume I & Annexes, Volume II.</footer>
+        </div>
+      </section>
+    </main>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script><script src="data.js"></script><script src="language.js"></script><script src="app.js"></script>
+  </body>
 </html>
